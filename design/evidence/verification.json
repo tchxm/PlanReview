@@ -1,0 +1,159 @@
+{
+  "boot": [
+    {
+      "key": "context",
+      "message": "WebGL context created \u2014 local visual engine",
+      "seconds": 0.06890000000037252
+    },
+    {
+      "key": "lattice",
+      "message": "Built 1,650-node lattice + 150 hubs",
+      "seconds": 0.07769999999925495
+    },
+    {
+      "key": "links",
+      "message": "Linked 436 real edges",
+      "seconds": 0.07779999999888242
+    },
+    {
+      "key": "robot",
+      "message": "Calibrated reviewer PB-01 \u00b7 7 cables / 126 nodes",
+      "seconds": 1.1452999999988824
+    },
+    {
+      "key": "tree",
+      "message": "Grew 2897 decision segments \u00b7 seed 0x5EED",
+      "seconds": 1.545199999999255
+    },
+    {
+      "key": "shaders",
+      "message": "Hero and tree shader compilation requested",
+      "seconds": 1.613699999999255
+    }
+  ],
+  "continuity": {
+    "positionError": 1.1102230246251565e-15,
+    "lookError": 2.220446049250313e-16,
+    "original": {
+      "position": [
+        0.53,
+        -0.18,
+        -1.200000000000001
+      ],
+      "look": [
+        1.9299999999999997,
+        0.05,
+        -2.7
+      ]
+    },
+    "railStart": [
+      0.53,
+      -0.18,
+      -1.2
+    ],
+    "railLook": [
+      1.93,
+      0.05,
+      -2.7
+    ]
+  },
+  "tree": {
+    "segments": 2897,
+    "sha256": "387fe109731f2625b73aecd85ce7fca5282aa6c499a4702e0711c453edd65af0"
+  },
+  "station": {
+    "text": "03 / 06",
+    "active": "Boundary engine",
+    "p": 0.6050793533232891
+  },
+  "dialog": true,
+  "robotTrack": {
+    "state": "CURIOUS",
+    "yaw": 0.7736620771783242,
+    "cables": 7,
+    "triangles": 27932,
+    "calls": 32,
+    "cursor": "LOOK"
+  },
+  "robotFlick": "CURIOUS",
+  "robotClick": "ACK",
+  "robotIdle": "IDLE",
+  "memoryBefore": {
+    "hero": {
+      "geometries": 26,
+      "textures": 13
+    },
+    "robot": {
+      "geometries": 33,
+      "textures": 4
+    }
+  },
+  "scrollSeconds": 60.42200000000048,
+  "memoryAfter": {
+    "hero": {
+      "geometries": 26,
+      "textures": 13
+    },
+    "robot": {
+      "geometries": 33,
+      "textures": 4
+    }
+  },
+  "frameMsSamples": [
+    8.911667453447967,
+    20.363334237734467,
+    9.011667782465619,
+    19.90500117142993,
+    9.370001389185601,
+    20.60500154018401,
+    9.140001788139346,
+    20.946668508847544,
+    8.908335518836953,
+    20.71333554267886,
+    9.373335851033554,
+    21.295002581278435,
+    9.268336259524078,
+    21.295003077189154,
+    8.918336537679087,
+    20.483336615562415,
+    8.913336787223768,
+    20.71667025248205,
+    9.593337187766982,
+    20.828337268829372,
+    9.258337424596153,
+    21.293337392806983,
+    9.258337594668024,
+    21.406671045621238,
+    9.366671304702663,
+    20.830004728635057,
+    9.373338268597923,
+    20.94333832581843,
+    9.370005362828525,
+    20.83000549157451
+  ],
+  "cpu4x": {
+    "average": 10.763339614868263,
+    "tiers": [],
+    "quality": 0
+  },
+  "hardware": "ANGLE (Intel, Intel(R) UHD Graphics (0x0000468B) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+  "errors": [],
+  "console": [],
+  "deterministic": true,
+  "reduced": {
+    "reduced": true,
+    "items": 6,
+    "overflow": false,
+    "errors": []
+  },
+  "mobile": {
+    "overflow": false,
+    "errors": []
+  },
+  "fallback": {
+    "webgl": false,
+    "ready": true,
+    "started": true,
+    "errors": []
+  }
+}
