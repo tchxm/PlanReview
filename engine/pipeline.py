@@ -7,6 +7,8 @@ from engine.types import Contract
 from engine.canonicalizer import canonicalize
 from engine.evaluator import evaluate_all
 from engine.gate import apply_saved, digest
+from engine.intent import interpret
+from engine.guard import verify_workspace_configuration
 
 ROOT = Path(__file__).resolve().parents[1]
 LOCK = threading.RLock()
@@ -34,11 +36,12 @@ class Pipeline:
         self.store = Store(self.data / "planreview.sqlite")
 
     def create(self, task, mode="replay"):
-        if mode not in ["replay", "ollama"]:
+        if mode not in ["replay", "adversarial", "ollama", "live"]:
             raise ValueError("Unknown mode")
-        # The deterministic extractor remains the contract authority: repeated
-        # constrained local-model outputs were schema-valid but lost scope text.
-        c = draft(task)
+
+        # Extract structured intent and validate against capability registry
+        intent_proposal = interpret(task, mode=mode)
+        c = draft(task, mode=mode, intent=intent_proposal)
         c = Contract.model_validate(
             {**c.model_dump(), "contract_id": str(uuid.uuid4())}
         )
@@ -46,6 +49,7 @@ class Pipeline:
             id=c.contract_id,
             contract=c.model_dump(mode="json"),
             mode=mode,
+            intent=intent_proposal.model_dump() if intent_proposal else None,
             stage="draft",
             runs=[],
             resolutions={},
@@ -72,7 +76,7 @@ class Pipeline:
         assert_contract_integrity(t)
         if not Contract.model_validate(t["contract"]).active():
             raise ValueError("Active confirmed contract required")
-        if variant not in ["baseline", "intended", "review", "poisoned"]:
+        if variant not in ["baseline", "intended", "review", "poisoned", "adversarial"]:
             raise ValueError("Unknown fixture")
         workspace = self.data / "workspaces" / id
         if t.get("prepared"):
@@ -84,18 +88,44 @@ class Pipeline:
             workspace.mkdir(parents=True)
             for name in ["terraform.tfstate", "lambda.zip", ".terraform.lock.hcl"]:
                 shutil.copy2(source / name, workspace / name)
-        source = (
-            ROOT
-            / "terraform/fixtures"
-            / ("baseline" if t["mode"] == "ollama" else variant)
-            / "main.tf"
-        )
-        shutil.copy2(source, workspace / "main.tf")
-        log = "Offline fixture replay; no LLM was invoked"
-        if t["mode"] == "ollama":
-            from engine.agent import live_edit
 
-            log = live_edit(t["contract"]["task"], workspace)
+        log = "Offline fixture replay; no LLM was invoked"
+        t["agent_variant"] = variant
+
+        if t["mode"] in ["ollama", "live"]:
+            # Live AI agent mode: uses baseline main.tf and calls intent-gated live_edit
+            shutil.copy2(ROOT / "terraform/fixtures/baseline/main.tf", workspace / "main.tf")
+            from engine.agent import live_edit
+            try:
+                log = live_edit(t["contract"]["task"], workspace, intent=t.get("intent"), adversarial=False)
+            except TypeError:
+                log = live_edit(t["contract"]["task"], workspace)
+        elif t["mode"] == "adversarial" or variant in ["poisoned", "adversarial"]:
+            # Explicit adversarial demonstration
+            source = ROOT / "terraform/fixtures/poisoned/main.tf"
+            shutil.copy2(source, workspace / "main.tf")
+            log = "Explicit adversarial demonstration replay; ALLOW/REVIEW/DENY verdicts generated"
+        elif variant == "intended":
+            # Normal replay: apply parameter-driven intended change
+            shutil.copy2(ROOT / "terraform/fixtures/baseline/main.tf", workspace / "main.tf")
+            intent = t.get("intent")
+            if intent and intent.get("operation") == "update_memory":
+                mem = intent.get("requested_value", 1024)
+                w_main = (workspace / "main.tf").read_text(encoding="utf-8")
+                (workspace / "main.tf").write_text(w_main.replace("memory_size = 512", f"memory_size = {mem}"), encoding="utf-8")
+                log = f"Replay applied validated memory_size={mem} to dev_api Lambda"
+            elif intent and intent.get("operation") == "update_tags":
+                team = intent.get("requested_value", "core")
+                w_main = (workspace / "main.tf").read_text(encoding="utf-8")
+                rep = f'resource "aws_s3_bucket" "assets" {{\n  bucket = "planreview-demo-assets"\n  tags = {{ Environment = "dev", Team = "{team}" }}\n}}'
+                (workspace / "main.tf").write_text(w_main.replace('resource "aws_s3_bucket" "assets" {\n  bucket = "planreview-demo-assets"\n  tags = { Environment = "dev" }\n}', rep), encoding="utf-8")
+                log = f"Replay applied validated Team={team} tag to assets S3 bucket"
+            else:
+                shutil.copy2(ROOT / "terraform/fixtures/intended/main.tf", workspace / "main.tf")
+        else:
+            source = ROOT / "terraform/fixtures" / variant / "main.tf"
+            shutil.copy2(source, workspace / "main.tf")
+
         t["workspace"] = str(workspace)
         t["prepared"] = True
         t["stage"] = "edited"
@@ -136,14 +166,17 @@ class Pipeline:
         if not Contract.model_validate(t["contract"]).active():
             raise ValueError("Contract expired")
         path = Path(t["workspace"])
-        config = (path / "main.tf").read_text()
-        baseline = (ROOT / "terraform/fixtures/baseline/main.tf").read_text()
-        if config.split("resource ", 1)[0] != baseline.split("resource ", 1)[
-            0
-        ] or re.search(r'\b(provisioner|data|module|backend)\s+"', config):
-            raise ValueError(
-                "Unsupported executable Terraform configuration; planning blocked"
-            )
+
+        # Pre-plan configuration and workspace integrity guard
+        verify_workspace_configuration(
+            workspace_path=path,
+            contract=Contract.model_validate(t["contract"]),
+            intent=t.get("intent"),
+            mode=t["mode"],
+            variant=t.get("agent_variant", "intended"),
+            root_path=ROOT,
+        )
+
         if not (path / ".terraform").exists():
             self.command(["init", "-input=false", "-no-color"], path)
         rid = str(uuid.uuid4())
@@ -224,7 +257,18 @@ class Pipeline:
         if run["verdicts"] is None:
             raise ValueError("Pipeline incomplete: evaluate first")
         reviews = {v["address"] for v in run["verdicts"] if v["verdict"] == "REVIEW"}
+        eval_errors = {
+            v["address"]
+            for v in run["verdicts"]
+            if "Cedar evaluation unavailable" in v.get("reason", "")
+            or "evaluation error" in v.get("reason", "").lower()
+            or v.get("verdict") == "EVALUATION_ERROR"
+        }
         for address, decision in resolutions.items():
+            if address in eval_errors:
+                raise ValueError(
+                    f"Address {address} experienced an evaluation error and cannot be approved. Repair evaluation and re-run."
+                )
             if address not in reviews or decision not in ["approve", "reject"]:
                 raise ValueError(
                     "Only REVIEW items accept approve/reject resolutions; DENY requires a new plan"
