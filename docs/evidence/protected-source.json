@@ -1,0 +1,8 @@
+{
+  "engine/gate.py": true,
+  "engine/storage.py": true,
+  "engine/pipeline.py": true,
+  "engine/api.py": true,
+  "web/src/main.jsx": true,
+  "web/src/styles.css": true
+}

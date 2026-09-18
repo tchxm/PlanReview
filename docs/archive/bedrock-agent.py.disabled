@@ -1,0 +1,84 @@
+"""Optional live integrations. File tools are restricted to the isolated task fixture."""
+
+import os
+from pathlib import Path
+from engine.types import Contract
+
+
+def bedrock_configuration():
+    """Inspect the real SDK credential chain without exposing credential values."""
+    import boto3
+
+    session = boto3.Session()
+    credentials = session.get_credentials()
+    return {
+        'model_configured': bool(os.getenv('PLANREVIEW_BEDROCK_MODEL')),
+        'credentials_resolved': credentials is not None,
+        'bearer_token_configured': bool(os.getenv('AWS_BEARER_TOKEN_BEDROCK')),
+        'region': os.getenv('AWS_REGION') or session.region_name or 'ap-south-1',
+    }
+
+
+def bedrock_model():
+    import boto3
+    from botocore.config import Config
+    from strands.models import BedrockModel
+
+    settings = bedrock_configuration()
+    missing = []
+    if not settings['model_configured']:
+        missing.append('PLANREVIEW_BEDROCK_MODEL')
+    if not (settings['credentials_resolved'] or settings['bearer_token_configured']):
+        missing.append('AWS credentials or a Bedrock bearer token')
+    if missing:
+        raise ValueError('Pipeline incomplete: missing ' + ' and '.join(missing))
+    kwargs = dict(
+        model_id=os.environ['PLANREVIEW_BEDROCK_MODEL'],
+        region_name=settings['region'],
+        boto_session=boto3.Session(),
+        boto_client_config=Config(connect_timeout=10, read_timeout=90, retries={'max_attempts':1}),
+    )
+    if settings['bearer_token_configured']:
+        kwargs['api_key'] = os.environ['AWS_BEARER_TOKEN_BEDROCK']
+    return BedrockModel(**kwargs)
+
+
+def live_edit(task: str, workspace: Path):
+    from strands import Agent, tool
+
+    @tool
+    def read_terraform() -> str:
+        """Read this task's Terraform main.tf."""
+        return (workspace / "main.tf").read_text()
+
+    @tool
+    def write_terraform(content: str) -> str:
+        """Replace this task's Terraform main.tf with the requested configuration."""
+        if len(content) > 100000:
+            raise ValueError("Configuration too large")
+        (workspace / "main.tf").write_text(content)
+        return "Terraform saved. No commands executed."
+
+    agent = Agent(
+        model=bedrock_model(),
+        tools=[read_terraform, write_terraform],
+        system_prompt="You edit only Terraform files for the user task. Read the file, then write the required edits. You have no command execution or approval authority. Do not modify providers, add provisioners, modules, data sources, or external programs.",
+    )
+    return str(agent(task))
+
+
+def live_draft(task: str) -> Contract:
+    from strands import Agent
+    from engine.contract import draft
+
+    agent = Agent(
+        model=bedrock_model(),
+        system_prompt="Draft a PlanReview contract. Only production, networking, public_access are concrete deny categories. Never claim human confirmation. Match scope narrowly to the task.",
+    )
+    result = agent.structured_output(
+        Contract,
+        task
+        + "\nUse these initial identifiers and expiry: "
+        + draft(task).model_dump_json(),
+    )
+    return Contract.model_validate({**result.model_dump(), "status": "draft"})

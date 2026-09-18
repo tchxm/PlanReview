@@ -1,0 +1,43 @@
+{
+  "stage": "drafts",
+  "model": "llama3.2:3b",
+  "host": "http://localhost:11434",
+  "attempts": [
+    {
+      "try": 1,
+      "seconds": 5.03,
+      "raw": "{\n  \"contract_id\": \"24b52348-09c4-4d0f-a00c-5c531c6c7ae5\",\n  \"task\": \"Increase dev-api Lambda memory\",\n  \"allowed_resource_addresses\": [\"aws_lambda_function.dev_api\"],\n  \"allowed_resource_types\": [\"aws_lambda_function\"],\n  \"allowed_operations\": [\"update\"],\n  \"allowed_regions\": [\"ap-south-1\"],\n  \"max_changed_resources\": 1,\n  \"max_cost_delta\": null,\n  \"denies\": [\"production\", \"networking\", \"public_access\"],\n  \"expires_at\": \"2026-09-19T11:31:36.717+00:00\",\n  \"status\": \"draft\"\n}",
+      "schema_valid": true,
+      "scope_correct": false
+    },
+    {
+      "try": 2,
+      "seconds": 4.51,
+      "raw": "{\"contract_id\": \"24b52348-09c4-4d0f-a00c-5c531c6c7ae5\", \"task\": \"Increase dev-api Lambda memory\", \"allowed_resource_addresses\": [\"aws_lambda_function.dev_api\"], \"allowed_resource_types\": [\"aws_lambda_function\"], \"allowed_operations\": [\"update\"], \"allowed_regions\": [\"ap-south-1\"], \"max_changed_resources\": 1, \"max_cost_delta\": null, \"denies\": [\"production\", \"networking\", \"public_access\"], \"expires_at\": \"2026-09-19T11:31:36.717+00:00\", \"status\": \"draft\"}",
+      "schema_valid": true,
+      "scope_correct": false
+    },
+    {
+      "try": 3,
+      "seconds": 4.48,
+      "raw": "{\"contract_id\": \"24b52348-09c4-4d0f-a00c-5c531c6c7ae5\", \"task\": \"Increase dev-api Lambda memory\", \"allowed_resource_addresses\": [\"aws_lambda_function.dev_api\"], \"allowed_resource_types\": [\"aws_lambda_function\"], \"allowed_operations\": [\"update\"], \"allowed_regions\": [\"ap-south-1\"], \"max_changed_resources\": 1, \"max_cost_delta\": null, \"denies\": [\"production\", \"networking\", \"public_access\"], \"expires_at\": \"2026-09-19T11:31:36.717+00:00\", \"status\": \"draft\"}",
+      "schema_valid": true,
+      "scope_correct": false
+    },
+    {
+      "try": 4,
+      "seconds": 4.48,
+      "raw": "{\"contract_id\": \"24b52348-09c4-4d0f-a00c-5c531c6c7ae5\", \"task\": \"Increase dev-api Lambda memory\", \"allowed_resource_addresses\": [\"aws_lambda_function.dev_api\"], \"allowed_resource_types\": [\"aws_lambda_function\"], \"allowed_operations\": [\"update\"], \"allowed_regions\": [\"ap-south-1\"], \"max_changed_resources\": 1, \"max_cost_delta\": null, \"denies\": [\"production\", \"networking\", \"public_access\"], \"expires_at\": \"2026-09-19T11:31:36.717+00:00\", \"status\": \"draft\"}",
+      "schema_valid": true,
+      "scope_correct": false
+    },
+    {
+      "try": 5,
+      "seconds": 4.49,
+      "raw": "{\"contract_id\": \"24b52348-09c4-4d0f-a00c-5c531c6c7ae5\", \"task\": \"Increase dev-api Lambda memory\", \"allowed_resource_addresses\": [\"aws_lambda_function.dev_api\"], \"allowed_resource_types\": [\"aws_lambda_function\"], \"allowed_operations\": [\"update\"], \"allowed_regions\": [\"ap-south-1\"], \"max_changed_resources\": 1, \"max_cost_delta\": null, \"denies\": [\"production\", \"networking\", \"public_access\"], \"expires_at\": \"2026-09-19T11:31:36.717+00:00\", \"status\": \"draft\"}",
+      "schema_valid": true,
+      "scope_correct": false
+    }
+  ],
+  "seconds": 23.41
+}

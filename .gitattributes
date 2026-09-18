@@ -1,0 +1,6 @@
+* text=auto
+*.sh text eol=lf
+*.py text eol=lf
+*.tf text eol=lf
+*.cedar text eol=lf
+*.json text eol=lf

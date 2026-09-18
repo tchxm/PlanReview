@@ -1,0 +1,29 @@
+{
+  "contract_id": "5317d579-1bb5-4e80-b5cf-06e0c4a35e5f",
+  "task": "increase dev-api Lambda memory, don't touch networking or production",
+  "allowed_resource_addresses": [
+    "aws_lambda_function.dev_api"
+  ],
+  "allowed_resource_types": [
+    "aws_lambda_function"
+  ],
+  "allowed_operations": [
+    "update"
+  ],
+  "allowed_regions": [
+    "ap-south-1"
+  ],
+  "max_changed_resources": 1,
+  "max_cost_delta": null,
+  "denies": [
+    "production",
+    "networking",
+    "public_access"
+  ],
+  "expires_at": "2026-09-19T10:18:22.813548Z",
+  "status": "draft"
+}
+PHASE 1 FIELD SET EXACT: True
+PYDANTIC SCHEMA VALID: True
+DRAFT ACTIVE: False
+CONFIRMED STORAGE VERSION: 1

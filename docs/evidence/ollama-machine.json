@@ -1,0 +1,17 @@
+{
+  "cpu": {
+    "exit_code": 0,
+    "output": "12th Gen Intel(R) Core(TM) i5-12450HX\n"
+  },
+  "gpu": {
+    "exit_code": 0,
+    "output": "name, memory.total [MiB], driver_version\nNVIDIA GeForce RTX 3050 6GB Laptop GPU, 6144 MiB, 581.86\n"
+  },
+  "ollama_version": {
+    "exit_code": 0,
+    "output": "ollama version is 0.34.2\n"
+  },
+  "installer_sha256": "8c9eb7ba71f3c6a62df4c7d204cc4739d90c335e1cbeb07c99fd471544066a8b",
+  "installer_source": "https://github.com/ollama/ollama/releases/download/v0.34.2/OllamaSetup.exe",
+  "cloud_disabled": true
+}

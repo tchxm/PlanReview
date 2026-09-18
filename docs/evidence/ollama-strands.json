@@ -1,0 +1,8 @@
+{
+  "stage": "strands",
+  "model": "llama3.2:3b",
+  "host": "http://localhost:11434",
+  "response": "STRANDS_LOCAL_OK\n",
+  "passed": true,
+  "seconds": 3.14
+}

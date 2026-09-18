@@ -1,0 +1,1 @@
+engine\contract\__init__.py:14:    # PLACEHOLDER: local contract drafting; no AWS credentials or Bedrock model are configured (Phase 2).

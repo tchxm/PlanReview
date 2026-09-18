@@ -1,0 +1,36 @@
+DRAFT {
+  "contract_id": "1e8ed075-0cef-4d53-b570-c886713ff5c1",
+  "task": "Increase memory for dev-api Lambda; send unanticipated networking changes to human review. Production and public access are forbidden.",
+  "allowed_resource_addresses": [
+    "aws_lambda_function.dev_api"
+  ],
+  "allowed_resource_types": [
+    "aws_lambda_function"
+  ],
+  "allowed_operations": [
+    "update"
+  ],
+  "allowed_regions": [
+    "ap-south-1"
+  ],
+  "max_changed_resources": 3,
+  "max_cost_delta": null,
+  "denies": [
+    "production",
+    "public_access"
+  ],
+  "expires_at": "2026-09-18T18:20:00.505140Z",
+  "status": "draft",
+  "version": 1
+}
+CONFIRMED 1e8ed075-0cef-4d53-b570-c886713ff5c1
+EDITED: offline fixture replay (not Strands)
+ALLOW aws_lambda_function.dev_api Exact address, resource type, operation and region match confirmed scope
+DENY aws_s3_bucket_public_access_block.assets Explicit policy forbids public_access
+REVIEW aws_security_group.api Change is outside the confirmed address/type/operation/region scope
+APPLY {'status': 'BLOCKED', 'reason': '1 unresolved DENY; edit configuration and create a new plan', 'spawned': False}
+ALLOW aws_lambda_function.dev_api
+REVIEW aws_security_group.api
+APPLY {'status': 'BLOCKED', 'reason': 'AWS apply disabled: configure and verify an isolated emulator first', 'spawned': False}
+AWS apply remains disabled. Successful real local apply proof: pytest tests/test_gate.py::test_real_local_apply
+AUDIT 15 stored events; task 1e8ed075-0cef-4d53-b570-c886713ff5c1

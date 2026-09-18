@@ -1,0 +1,4 @@
+BEDROCK CONFIGURATION: {"bearer_token_configured": false, "credentials_resolved": false, "model_configured": false, "region": "ap-south-1"}
+CALL: live_edit(demo_task, isolated_baseline_workspace)
+LIVE AGENT ACCEPTANCE: FAIL � Pipeline incomplete: missing PLANREVIEW_BEDROCK_MODEL and AWS credentials or a Bedrock bearer token
+EVIDENCE: C:\Users\kario\OneDrive\Documents\PlanReview\docs\evidence\live-agent.json

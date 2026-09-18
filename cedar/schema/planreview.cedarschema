@@ -1,0 +1,21 @@
+entity User;
+entity Resource;
+action "evaluate" appliesTo {
+  principal: [User],
+  resource: [Resource],
+  context: {
+    address: String,
+    resource_type: String,
+    operation: String,
+    region: String,
+    unknown: Bool,
+    production: Bool,
+    networking: Bool,
+    public_access: Bool,
+    deny_networking: Bool,
+    addresses: Set<String>,
+    types: Set<String>,
+    operations: Set<String>,
+    regions: Set<String>
+  }
+};

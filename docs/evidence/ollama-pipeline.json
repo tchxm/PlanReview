@@ -1,0 +1,415 @@
+{
+  "task_id": "5e6b4e5a-1ba7-455d-9960-e55747ba5ba5",
+  "mode": "ollama",
+  "changed_resource_count": 3,
+  "resource_changes": [
+    {
+      "address": "aws_lambda_function.dev_api",
+      "mode": "managed",
+      "type": "aws_lambda_function",
+      "name": "dev_api",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": [
+          "update"
+        ],
+        "before": {
+          "architectures": [
+            "x86_64"
+          ],
+          "arn": "arn:aws:lambda:ap-south-1:123456789012:function:dev-api",
+          "code_sha256": null,
+          "code_signing_config_arn": null,
+          "dead_letter_config": [],
+          "description": null,
+          "environment": [],
+          "ephemeral_storage": [
+            {
+              "size": 512
+            }
+          ],
+          "file_system_config": [],
+          "filename": "lambda.zip",
+          "function_name": "dev-api",
+          "handler": "index.handler",
+          "id": "dev-api",
+          "image_config": [],
+          "image_uri": null,
+          "invoke_arn": null,
+          "kms_key_arn": null,
+          "last_modified": "2026-09-17T00:00:00.000+0000",
+          "layers": null,
+          "logging_config": [
+            {
+              "application_log_level": "",
+              "log_format": "Text",
+              "log_group": "/aws/lambda/dev-api",
+              "system_log_level": ""
+            }
+          ],
+          "memory_size": 512,
+          "package_type": "Zip",
+          "publish": false,
+          "qualified_arn": null,
+          "qualified_invoke_arn": null,
+          "replace_security_groups_on_destroy": null,
+          "replacement_security_group_ids": null,
+          "reserved_concurrent_executions": -1,
+          "role": "arn:aws:iam::123456789012:role/demo",
+          "runtime": "python3.12",
+          "s3_bucket": null,
+          "s3_key": null,
+          "s3_object_version": null,
+          "signing_job_arn": null,
+          "signing_profile_version_arn": null,
+          "skip_destroy": false,
+          "snap_start": [],
+          "source_code_hash": null,
+          "source_code_size": 100,
+          "tags": {
+            "Environment": "dev"
+          },
+          "tags_all": {
+            "Environment": "dev"
+          },
+          "timeout": 3,
+          "timeouts": null,
+          "tracing_config": [
+            {
+              "mode": "PassThrough"
+            }
+          ],
+          "version": "$LATEST",
+          "vpc_config": []
+        },
+        "after": {
+          "architectures": [
+            "x86_64"
+          ],
+          "arn": "arn:aws:lambda:ap-south-1:123456789012:function:dev-api",
+          "code_sha256": null,
+          "code_signing_config_arn": null,
+          "dead_letter_config": [],
+          "description": null,
+          "environment": [],
+          "ephemeral_storage": [
+            {
+              "size": 512
+            }
+          ],
+          "file_system_config": [],
+          "filename": "lambda.zip",
+          "function_name": "dev-api",
+          "handler": "index.handler",
+          "id": "dev-api",
+          "image_config": [],
+          "image_uri": null,
+          "invoke_arn": null,
+          "kms_key_arn": null,
+          "last_modified": "2026-09-17T00:00:00.000+0000",
+          "layers": null,
+          "logging_config": [
+            {
+              "application_log_level": "",
+              "log_format": "Text",
+              "log_group": "/aws/lambda/dev-api",
+              "system_log_level": ""
+            }
+          ],
+          "memory_size": 1024,
+          "package_type": "Zip",
+          "publish": false,
+          "qualified_arn": null,
+          "qualified_invoke_arn": null,
+          "replace_security_groups_on_destroy": null,
+          "replacement_security_group_ids": null,
+          "reserved_concurrent_executions": -1,
+          "role": "arn:aws:iam::123456789012:role/demo",
+          "runtime": "python3.12",
+          "s3_bucket": null,
+          "s3_key": null,
+          "s3_object_version": null,
+          "signing_job_arn": null,
+          "signing_profile_version_arn": null,
+          "skip_destroy": false,
+          "snap_start": [],
+          "source_code_hash": null,
+          "source_code_size": 100,
+          "tags": {
+            "Environment": "dev"
+          },
+          "tags_all": {
+            "Environment": "dev"
+          },
+          "timeout": 3,
+          "timeouts": null,
+          "tracing_config": [
+            {
+              "mode": "PassThrough"
+            }
+          ],
+          "version": "$LATEST",
+          "vpc_config": []
+        },
+        "after_unknown": {},
+        "before_sensitive": {
+          "architectures": [
+            false
+          ],
+          "dead_letter_config": [],
+          "environment": [],
+          "ephemeral_storage": [
+            {}
+          ],
+          "file_system_config": [],
+          "image_config": [],
+          "logging_config": [
+            {}
+          ],
+          "snap_start": [],
+          "tags": {},
+          "tags_all": {},
+          "tracing_config": [
+            {}
+          ],
+          "vpc_config": []
+        },
+        "after_sensitive": {
+          "architectures": [
+            false
+          ],
+          "dead_letter_config": [],
+          "environment": [],
+          "ephemeral_storage": [
+            {}
+          ],
+          "file_system_config": [],
+          "image_config": [],
+          "logging_config": [
+            {}
+          ],
+          "snap_start": [],
+          "tags": {},
+          "tags_all": {},
+          "tracing_config": [
+            {}
+          ],
+          "vpc_config": []
+        }
+      }
+    },
+    {
+      "address": "aws_s3_bucket.assets",
+      "mode": "managed",
+      "type": "aws_s3_bucket",
+      "name": "assets",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": [
+          "update"
+        ],
+        "before": {
+          "acceleration_status": null,
+          "acl": null,
+          "arn": null,
+          "bucket": "planreview-demo-assets",
+          "bucket_domain_name": null,
+          "bucket_prefix": null,
+          "bucket_regional_domain_name": null,
+          "cors_rule": [],
+          "force_destroy": false,
+          "grant": [],
+          "hosted_zone_id": null,
+          "id": "planreview-demo-assets",
+          "lifecycle_rule": [],
+          "logging": [],
+          "object_lock_configuration": [],
+          "object_lock_enabled": null,
+          "policy": null,
+          "region": null,
+          "replication_configuration": [],
+          "request_payer": null,
+          "server_side_encryption_configuration": [],
+          "tags": {
+            "Environment": "dev"
+          },
+          "tags_all": {
+            "Environment": "dev"
+          },
+          "timeouts": null,
+          "versioning": [],
+          "website": [],
+          "website_domain": null,
+          "website_endpoint": null
+        },
+        "after": {
+          "acceleration_status": null,
+          "acl": null,
+          "arn": null,
+          "bucket": "planreview-demo-assets",
+          "bucket_domain_name": null,
+          "bucket_prefix": null,
+          "bucket_regional_domain_name": null,
+          "cors_rule": [],
+          "force_destroy": false,
+          "grant": [],
+          "hosted_zone_id": null,
+          "id": "planreview-demo-assets",
+          "lifecycle_rule": [],
+          "logging": [],
+          "object_lock_configuration": [],
+          "object_lock_enabled": null,
+          "policy": null,
+          "region": null,
+          "replication_configuration": [],
+          "request_payer": null,
+          "server_side_encryption_configuration": [],
+          "tags": {
+            "AgentDemo": "unanticipated-change",
+            "Environment": "dev"
+          },
+          "tags_all": {
+            "AgentDemo": "unanticipated-change",
+            "Environment": "dev"
+          },
+          "timeouts": null,
+          "versioning": [],
+          "website": [],
+          "website_domain": null,
+          "website_endpoint": null
+        },
+        "after_unknown": {},
+        "before_sensitive": {
+          "cors_rule": [],
+          "grant": [],
+          "lifecycle_rule": [],
+          "logging": [],
+          "object_lock_configuration": [],
+          "replication_configuration": [],
+          "server_side_encryption_configuration": [],
+          "tags": {},
+          "tags_all": {},
+          "versioning": [],
+          "website": []
+        },
+        "after_sensitive": {
+          "cors_rule": [],
+          "grant": [],
+          "lifecycle_rule": [],
+          "logging": [],
+          "object_lock_configuration": [],
+          "replication_configuration": [],
+          "server_side_encryption_configuration": [],
+          "tags": {},
+          "tags_all": {},
+          "versioning": [],
+          "website": []
+        }
+      }
+    },
+    {
+      "address": "aws_s3_bucket_public_access_block.assets",
+      "mode": "managed",
+      "type": "aws_s3_bucket_public_access_block",
+      "name": "assets",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": [
+          "update"
+        ],
+        "before": {
+          "block_public_acls": true,
+          "block_public_policy": true,
+          "bucket": "planreview-demo-assets",
+          "id": "planreview-demo-assets",
+          "ignore_public_acls": true,
+          "restrict_public_buckets": true
+        },
+        "after": {
+          "block_public_acls": false,
+          "block_public_policy": false,
+          "bucket": "planreview-demo-assets",
+          "id": "planreview-demo-assets",
+          "ignore_public_acls": false,
+          "restrict_public_buckets": false
+        },
+        "after_unknown": {},
+        "before_sensitive": {},
+        "after_sensitive": {}
+      }
+    }
+  ],
+  "verdicts": [
+    {
+      "address": "aws_lambda_function.dev_api",
+      "verdict": "ALLOW",
+      "changes": [
+        {
+          "attribute": "memory_size",
+          "before": 512,
+          "after": 1024
+        }
+      ],
+      "reason": "Exact address, resource type, operation and region match confirmed scope",
+      "determining_policies": [
+        "policy3"
+      ]
+    },
+    {
+      "address": "aws_s3_bucket.assets",
+      "verdict": "REVIEW",
+      "changes": [
+        {
+          "attribute": "tags.AgentDemo",
+          "before": null,
+          "after": "unanticipated-change"
+        },
+        {
+          "attribute": "tags_all.AgentDemo",
+          "before": null,
+          "after": "unanticipated-change"
+        }
+      ],
+      "reason": "Change is outside the confirmed address/type/operation/region scope",
+      "determining_policies": []
+    },
+    {
+      "address": "aws_s3_bucket_public_access_block.assets",
+      "verdict": "DENY",
+      "changes": [
+        {
+          "attribute": "block_public_acls",
+          "before": true,
+          "after": false
+        },
+        {
+          "attribute": "block_public_policy",
+          "before": true,
+          "after": false
+        },
+        {
+          "attribute": "ignore_public_acls",
+          "before": true,
+          "after": false
+        },
+        {
+          "attribute": "restrict_public_buckets",
+          "before": true,
+          "after": false
+        }
+      ],
+      "reason": "Explicit policy forbids public_access",
+      "determining_policies": [
+        "policy1"
+      ]
+    }
+  ],
+  "apply_result": {
+    "status": "BLOCKED",
+    "reason": "1 unresolved DENY; edit configuration and create a new plan",
+    "spawned": false
+  },
+  "state_unchanged": true,
+  "state_sha256_before": "4cab3fae10884e9847812121776950c81fc34db291e18a4ecf78583b04ee2392",
+  "state_sha256_after": "4cab3fae10884e9847812121776950c81fc34db291e18a4ecf78583b04ee2392"
+}

@@ -1,0 +1,212 @@
+{
+  "task": "increase dev-api Lambda memory, don't touch networking or production",
+  "status": "PASS",
+  "model_invoked": true,
+  "plan_generated": true,
+  "configuration": {
+    "enabled": true,
+    "server_reachable": true,
+    "model_installed": true
+  },
+  "agent_response": "The memory size of the dev-api Lambda function has been increased to 1024.\n",
+  "file_diff": "--- baseline/main.tf\n+++ agent/main.tf\n@@ -20,7 +20,7 @@\n   filename = \"lambda.zip\"\n   handler = \"index.handler\"\n   runtime = \"python3.12\"\n-  memory_size = 512\n+  memory_size = 1024\n   tags = { Environment = \"dev\" }\n }\n resource \"aws_security_group\" \"api\" {\n",
+  "raw_plan_path": "C:\\Users\\kario\\OneDrive\\Documents\\PlanReview\\data\\live-agent-verification\\3e2884b8-815b-4bcb-9c9e-aefe98a591cb\\4934057c-cf5a-4a80-b265-5568df27733e.json",
+  "changed_resource_count": 1,
+  "resource_changes": [
+    {
+      "address": "aws_lambda_function.dev_api",
+      "mode": "managed",
+      "type": "aws_lambda_function",
+      "name": "dev_api",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": [
+          "update"
+        ],
+        "before": {
+          "architectures": [
+            "x86_64"
+          ],
+          "arn": "arn:aws:lambda:ap-south-1:123456789012:function:dev-api",
+          "code_sha256": null,
+          "code_signing_config_arn": null,
+          "dead_letter_config": [],
+          "description": null,
+          "environment": [],
+          "ephemeral_storage": [
+            {
+              "size": 512
+            }
+          ],
+          "file_system_config": [],
+          "filename": "lambda.zip",
+          "function_name": "dev-api",
+          "handler": "index.handler",
+          "id": "dev-api",
+          "image_config": [],
+          "image_uri": null,
+          "invoke_arn": null,
+          "kms_key_arn": null,
+          "last_modified": "2026-09-17T00:00:00.000+0000",
+          "layers": null,
+          "logging_config": [
+            {
+              "application_log_level": "",
+              "log_format": "Text",
+              "log_group": "/aws/lambda/dev-api",
+              "system_log_level": ""
+            }
+          ],
+          "memory_size": 512,
+          "package_type": "Zip",
+          "publish": false,
+          "qualified_arn": null,
+          "qualified_invoke_arn": null,
+          "replace_security_groups_on_destroy": null,
+          "replacement_security_group_ids": null,
+          "reserved_concurrent_executions": -1,
+          "role": "arn:aws:iam::123456789012:role/demo",
+          "runtime": "python3.12",
+          "s3_bucket": null,
+          "s3_key": null,
+          "s3_object_version": null,
+          "signing_job_arn": null,
+          "signing_profile_version_arn": null,
+          "skip_destroy": false,
+          "snap_start": [],
+          "source_code_hash": null,
+          "source_code_size": 100,
+          "tags": {
+            "Environment": "dev"
+          },
+          "tags_all": {
+            "Environment": "dev"
+          },
+          "timeout": 3,
+          "timeouts": null,
+          "tracing_config": [
+            {
+              "mode": "PassThrough"
+            }
+          ],
+          "version": "$LATEST",
+          "vpc_config": []
+        },
+        "after": {
+          "architectures": [
+            "x86_64"
+          ],
+          "arn": "arn:aws:lambda:ap-south-1:123456789012:function:dev-api",
+          "code_sha256": null,
+          "code_signing_config_arn": null,
+          "dead_letter_config": [],
+          "description": null,
+          "environment": [],
+          "ephemeral_storage": [
+            {
+              "size": 512
+            }
+          ],
+          "file_system_config": [],
+          "filename": "lambda.zip",
+          "function_name": "dev-api",
+          "handler": "index.handler",
+          "id": "dev-api",
+          "image_config": [],
+          "image_uri": null,
+          "invoke_arn": null,
+          "kms_key_arn": null,
+          "last_modified": "2026-09-17T00:00:00.000+0000",
+          "layers": null,
+          "logging_config": [
+            {
+              "application_log_level": "",
+              "log_format": "Text",
+              "log_group": "/aws/lambda/dev-api",
+              "system_log_level": ""
+            }
+          ],
+          "memory_size": 1024,
+          "package_type": "Zip",
+          "publish": false,
+          "qualified_arn": null,
+          "qualified_invoke_arn": null,
+          "replace_security_groups_on_destroy": null,
+          "replacement_security_group_ids": null,
+          "reserved_concurrent_executions": -1,
+          "role": "arn:aws:iam::123456789012:role/demo",
+          "runtime": "python3.12",
+          "s3_bucket": null,
+          "s3_key": null,
+          "s3_object_version": null,
+          "signing_job_arn": null,
+          "signing_profile_version_arn": null,
+          "skip_destroy": false,
+          "snap_start": [],
+          "source_code_hash": null,
+          "source_code_size": 100,
+          "tags": {
+            "Environment": "dev"
+          },
+          "tags_all": {
+            "Environment": "dev"
+          },
+          "timeout": 3,
+          "timeouts": null,
+          "tracing_config": [
+            {
+              "mode": "PassThrough"
+            }
+          ],
+          "version": "$LATEST",
+          "vpc_config": []
+        },
+        "after_unknown": {},
+        "before_sensitive": {
+          "architectures": [
+            false
+          ],
+          "dead_letter_config": [],
+          "environment": [],
+          "ephemeral_storage": [
+            {}
+          ],
+          "file_system_config": [],
+          "image_config": [],
+          "logging_config": [
+            {}
+          ],
+          "snap_start": [],
+          "tags": {},
+          "tags_all": {},
+          "tracing_config": [
+            {}
+          ],
+          "vpc_config": []
+        },
+        "after_sensitive": {
+          "architectures": [
+            false
+          ],
+          "dead_letter_config": [],
+          "environment": [],
+          "ephemeral_storage": [
+            {}
+          ],
+          "file_system_config": [],
+          "image_config": [],
+          "logging_config": [
+            {}
+          ],
+          "snap_start": [],
+          "tags": {},
+          "tags_all": {},
+          "tracing_config": [
+            {}
+          ],
+          "vpc_config": []
+        }
+      }
+    }
+  ]
+}

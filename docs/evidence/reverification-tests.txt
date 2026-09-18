@@ -1,0 +1,47 @@
+============================= test session starts =============================
+platform win32 -- Python 3.12.3, pytest-9.1.1, pluggy-1.6.0 -- C:\Users\kario\OneDrive\Documents\PlanReview\.venv\Scripts\python.exe
+cachedir: .pytest_cache
+rootdir: C:\Users\kario\OneDrive\Documents\PlanReview
+configfile: pytest.ini
+testpaths: tests, cedar/tests
+plugins: anyio-4.15.1
+collecting ... collected 30 items
+
+tests/test_api.py::test_contract_boundary_and_audit PASSED               [  3%]
+tests/test_api.py::test_fuzzy_deny_rejected PASSED                       [  6%]
+tests/test_api.py::test_cross_origin_blocked PASSED                      [ 10%]
+tests/test_engine.py::test_02_uncovered_network_is_review[deterministic] PASSED [ 13%]
+tests/test_engine.py::test_02_uncovered_network_is_review[cedar] PASSED  [ 16%]
+tests/test_engine.py::test_01_intended_allow[deterministic] PASSED       [ 20%]
+tests/test_engine.py::test_01_intended_allow[cedar] PASSED               [ 23%]
+tests/test_engine.py::test_03_production_deny[deterministic] PASSED      [ 26%]
+tests/test_engine.py::test_03_production_deny[cedar] PASSED              [ 30%]
+tests/test_engine.py::test_04_public_deny[deterministic] PASSED          [ 33%]
+tests/test_engine.py::test_04_public_deny[cedar] PASSED                  [ 36%]
+tests/test_engine.py::test_05_unknown_review[deterministic] PASSED       [ 40%]
+tests/test_engine.py::test_05_unknown_review[cedar] PASSED               [ 43%]
+tests/test_engine.py::test_06_replacement PASSED                         [ 46%]
+tests/test_engine.py::test_07_expired PASSED                             [ 50%]
+tests/test_engine.py::test_08_independent PASSED                         [ 53%]
+tests/test_engine.py::test_noop_and_indices PASSED                       [ 56%]
+tests/test_engine.py::test_malformed PASSED                              [ 60%]
+tests/test_engine.py::test_network_explicit_deny PASSED                  [ 63%]
+tests/test_engine.py::test_immutable PASSED                              [ 66%]
+tests/test_engine.py::test_count_limit PASSED                            [ 70%]
+tests/test_engine.py::test_sensitive_diff PASSED                         [ 73%]
+tests/test_gate.py::test_deny_preserves_real_aws_state PASSED            [ 76%]
+tests/test_gate.py::test_real_local_apply PASSED                         [ 80%]
+tests/test_gate.py::test_hash_tampering PASSED                           [ 83%]
+tests/test_live_contract.py::test_stub_has_exact_phase1_payload_and_is_inert PASSED [ 86%]
+tests/test_live_contract.py::test_unconfigured_live_model_never_falls_back_to_replay PASSED [ 90%]
+tests/test_pipeline.py::test_real_pipeline_and_resolution_binding PASSED [ 93%]
+cedar/tests/test_policies.py::test_policy_schema PASSED                  [ 96%]
+cedar/tests/test_policies.py::test_determining_policies_distinguish_review PASSED [100%]
+
+============================== warnings summary ===============================
+.venv\Lib\site-packages\starlette\testclient.py:53
+  C:\Users\kario\OneDrive\Documents\PlanReview\.venv\Lib\site-packages\starlette\testclient.py:53: DeprecationWarning: The anyio.abc.BlockingPortal alias is deprecated, use anyio.from_thread.BlockingPortal instead.
+    _PortalFactoryType = Callable[[], AbstractContextManager[anyio.abc.BlockingPortal]]
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+======================= 30 passed, 1 warning in 34.29s ========================

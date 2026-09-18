@@ -1,0 +1,32 @@
+DRAFT {
+  "contract_id": "f5fc4604-b3c3-4f3c-b324-5fb12e222c8d",
+  "task": "Increase memory for dev-api Lambda; send unanticipated networking changes to human review. Production and public access are forbidden.",
+  "allowed_resource_addresses": [
+    "aws_lambda_function.dev_api"
+  ],
+  "allowed_resource_types": [
+    "aws_lambda_function"
+  ],
+  "allowed_operations": [
+    "update"
+  ],
+  "allowed_regions": [
+    "ap-south-1"
+  ],
+  "max_changed_resources": 3,
+  "max_cost_delta": null,
+  "denies": [
+    "production",
+    "public_access"
+  ],
+  "expires_at": "2026-09-18T18:20:51.110210Z",
+  "status": "draft",
+  "version": 1
+}
+CONFIRMED f5fc4604-b3c3-4f3c-b324-5fb12e222c8d
+EDITED: offline fixture replay (not Strands)
+ALLOW aws_lambda_function.dev_api Exact address, resource type, operation and region match confirmed scope
+DENY aws_s3_bucket_public_access_block.assets Explicit policy forbids public_access
+REVIEW aws_security_group.api Change is outside the confirmed address/type/operation/region scope
+APPLY {'status': 'BLOCKED', 'reason': '1 unresolved DENY; edit configuration and create a new plan', 'spawned': False}
+AUDIT 8 stored events; task f5fc4604-b3c3-4f3c-b324-5fb12e222c8d
