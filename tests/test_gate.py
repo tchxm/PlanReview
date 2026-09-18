@@ -1,6 +1,6 @@
 import json, subprocess
 from unittest.mock import patch
-from engine.gate import apply_saved, digest
+from engine.gate import apply_saved, digest, gate_reason
 from tests.test_engine import contract, changes, ROOT
 from engine.evaluator import evaluate_all
 
@@ -75,3 +75,52 @@ def test_hash_tampering(tmp_path):
         contract(), {"plan_path": str(p), "plan_hash": "wrong", "verdicts": []}, {}
     )
     assert not result["spawned"] and "hash" in result["reason"]
+
+
+def test_gate_reason_handles_missing_verdicts():
+    c = contract()
+    reason = gate_reason(c, None, {})
+    assert reason is not None
+    assert "verdict" in reason.lower() or "missing" in reason.lower()
+
+    run = {"verdicts": None}
+    res = apply_saved(c, run, {})
+    assert res["status"] == "BLOCKED"
+    assert not res["spawned"]
+
+
+def test_missing_canonical_blocks_apply(tmp_path):
+    c = contract()
+    p = tmp_path / "plan.tfplan"
+    p.write_bytes(b"dummy-plan")
+    h = digest(p)
+    
+    # Test completely missing canonical key
+    run_missing = {
+        "plan_path": str(p),
+        "plan_hash": h,
+        "verdicts": [],
+        "workspace": str(tmp_path),
+    }
+    with patch("engine.gate.subprocess.run") as mock_spawn:
+        res = apply_saved(c, run_missing, {})
+        mock_spawn.assert_not_called()
+    assert res["status"] == "BLOCKED"
+    assert not res["spawned"]
+    assert "canonical" in res["reason"].lower()
+
+    # Test canonical is None
+    run_none = {
+        "plan_path": str(p),
+        "plan_hash": h,
+        "verdicts": [],
+        "canonical": None,
+        "workspace": str(tmp_path),
+    }
+    with patch("engine.gate.subprocess.run") as mock_spawn:
+        res2 = apply_saved(c, run_none, {})
+        mock_spawn.assert_not_called()
+    assert res2["status"] == "BLOCKED"
+    assert not res2["spawned"]
+    assert "canonical" in res2["reason"].lower()
+
