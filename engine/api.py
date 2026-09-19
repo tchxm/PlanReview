@@ -1,9 +1,8 @@
 from fastapi import FastAPI, HTTPException
-from fastapi.staticfiles import StaticFiles
 from fastapi.responses import JSONResponse
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 from pydantic import BaseModel, Field
-from engine.pipeline import Pipeline, LOCK, ROOT
+from engine.pipeline import Pipeline, LOCK
 from engine.exceptions import PlanReviewError
 
 app = FastAPI(title="PlanReview", version="0.1.0")
@@ -118,6 +117,3 @@ def apply(id: str):
 def audit(id: str):
     return call(pipeline.store.audit, id)
 
-
-if (ROOT / "web/dist").exists():
-    app.mount("/", StaticFiles(directory=ROOT / "web/dist", html=True), name="console")
