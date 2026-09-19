@@ -18,7 +18,7 @@ import {
   Copy,
   ExternalLink,
 } from "lucide-react";
-import { api, describeError } from "./api";
+import { api, describeError } from "../api";
 import "./styles.css";
 
 const steps = [
