@@ -73,8 +73,8 @@ def live_edit(task: str, workspace: Path, intent: Any = None, adversarial: bool 
         """Set only aws_lambda_function.dev_api memory_size to the confirmed value."""
         if memory_size != target_mem:
             raise ValueError(f"The confirmed contract permits only memory_size={target_mem}, got {memory_size}")
-        if not (128 <= memory_size <= 10240 and memory_size % 64 == 0):
-            raise ValueError(f"Invalid memory_size {memory_size}: must be 128-10240 and multiple of 64")
+        if not (128 <= memory_size <= 10240):
+            raise ValueError(f"Invalid memory_size {memory_size}: must be 128-10240 MB")
         with EDIT_LOCK:
             path = workspace / "main.tf"
             original = path.read_text(encoding="utf-8")

@@ -24,10 +24,10 @@ CAPABILITY_REGISTRY = {
         "attribute": "memory_size",
         "min_value": 128,
         "max_value": 10240,
-        "step": 64,
+        "step": 1,
         "allowed_operations": ("update",),
         "allowed_regions": ("ap-south-1",),
-        "description": "Update AWS Lambda memory_size between 128MB and 10240MB in multiples of 64MB",
+        "description": "Update AWS Lambda memory_size between 128MB and 10240MB in 1MB increments",
     },
     "update_tags": {
         "resource_address": "aws_s3_bucket.assets",
@@ -119,12 +119,6 @@ def validate_capability(proposal: IntentProposal) -> tuple[bool, str, str | None
             return (
                 False,
                 f"Lambda memory_size must be between {cap['min_value']} and {cap['max_value']} MB, got {val}.",
-                "UNSUPPORTED_OPERATION",
-            )
-        if val % cap["step"] != 0:
-            return (
-                False,
-                f"Lambda memory_size must be a multiple of {cap['step']} MB, got {val}.",
                 "UNSUPPORTED_OPERATION",
             )
     elif op == "update_tags":

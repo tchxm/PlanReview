@@ -46,9 +46,9 @@ def evaluate(contract: Contract, change: CanonicalChange, backend="cedar") -> Ve
         except Exception as exc:
             return Verdict(
                 address=change.address,
-                verdict="REVIEW",
+                verdict="EVALUATION_ERROR",
                 changes=change.changes,
-                reason=f"Cedar evaluation unavailable: {type(exc).__name__}: {exc}",
+                reason=f"Cedar evaluation failed: {type(exc).__name__}: {exc}",
             )
     reason = (
         (

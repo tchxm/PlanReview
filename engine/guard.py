@@ -53,8 +53,8 @@ def verify_workspace_files(workspace_path: Path) -> None:
 
 
 def extract_resource_declarations(config: str) -> list[tuple[str, str]]:
-    """Extract all resource "type" "name" pairs from HCL."""
-    pattern = re.compile(r'resource\s+"([^"]+)"\s+"([^"]+)"')
+    """Extract all resource "type" "name" pairs from HCL with flexible whitespace."""
+    pattern = re.compile(r'\bresource\s+["\']?([^"\'\s{]+)["\']?\s+["\']?([^"\'\s{]+)["\']?')
     return pattern.findall(config)
 
 
@@ -83,9 +83,9 @@ def verify_workspace_configuration(
     baseline_path = root / "terraform/fixtures/baseline/main.tf"
     baseline = baseline_path.read_text(encoding="utf-8")
 
-    config_header = config.split("resource ", 1)[0]
-    baseline_header = baseline.split("resource ", 1)[0]
-    if config_header != baseline_header:
+    config_header = re.split(r'\bresource\s+["\']?', config, maxsplit=1)[0]
+    baseline_header = re.split(r'\bresource\s+["\']?', baseline, maxsplit=1)[0]
+    if config_header.strip() != baseline_header.strip():
         raise ValueError(
             "Provider header modified or unsupported provider declarations present; planning blocked"
         )

@@ -23,9 +23,10 @@ def gate_reason(contract, verdicts, resolutions, canonical=None):
         for v in verdicts
         if isinstance(v, dict)
         and (
-            "Cedar evaluation unavailable" in v.get("reason", "")
+            v.get("verdict") == "EVALUATION_ERROR"
+            or v.get("verdict") not in ["ALLOW", "REVIEW", "DENY"]
             or "evaluation error" in v.get("reason", "").lower()
-            or v.get("verdict") == "EVALUATION_ERROR"
+            or "Cedar evaluation unavailable" in v.get("reason", "")
         )
     ]
     if eval_errors:
