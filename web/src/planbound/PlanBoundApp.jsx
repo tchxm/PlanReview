@@ -4,10 +4,15 @@ import { SHELL_HTML } from "./shell.generated";
 import { HOME_MARKUP } from "./home";
 import { startEngine } from "./engine";
 import { useTasks } from "./state/tasks";
+import { taskFacts } from "./lib/taskModel";
 import { Nav, SiteFooter, MenuDialog } from "./chrome";
 import { HomeLive, HomeRecord } from "./pages/HomeLive";
 import HomeBelow from "./pages/HomeBelow";
-import Placeholder from "./pages/Placeholder";
+import { Workspace, NewTask } from "./pages/Tasks";
+import TaskContract from "./pages/TaskContract";
+import TaskPlan from "./pages/TaskPlan";
+import TaskEvidence from "./pages/TaskEvidence";
+import { HowItWorks, About, Legal, NotFound, LatestTaskRedirect } from "./pages/Editorial";
 
 /** React route -> the engine's original lifecycle route names. */
 const engineRoute = (p) => (p === "/" ? "/" : /^\/task\/[^/]+\/plan/.test(p) || p === "/plan-review" ? "/plan-review" : p);
@@ -66,6 +71,10 @@ export default function PlanBoundApp() {
     return () => ro.disconnect();
   }, [path, ready]);
 
+  // The engine's robot screen and tree read the gate from the backend, never from a sample store.
+  const gateOpen = tasks[0] ? taskFacts(tasks[0]).apply?.status === "APPLIED" : false;
+  useEffect(() => { if (ready) engine.current?.setGate(gateOpen); }, [gateOpen, ready]);
+
   return (
     <>
       <div dangerouslySetInnerHTML={shell} />
@@ -76,7 +85,17 @@ export default function PlanBoundApp() {
         <div id="route-view" hidden={path === "/"}>
           <Routes>
             <Route path="/" element={null} />
-            <Route path="*" element={<Placeholder engine={engine} />} />
+            <Route path="/how-it-works" element={<HowItWorks />} />
+            <Route path="/workspace" element={<Workspace />} />
+            <Route path="/new" element={<NewTask />} />
+            <Route path="/task/:id/contract" element={<TaskContract />} />
+            <Route path="/task/:id/plan" element={<TaskPlan />} />
+            <Route path="/task/:id/evidence" element={<TaskEvidence />} />
+            <Route path="/plan-review" element={<LatestTaskRedirect page="plan" />} />
+            <Route path="/evidence" element={<LatestTaskRedirect page="evidence" />} />
+            <Route path="/about" element={<About />} />
+            <Route path="/legal" element={<Legal />} />
+            <Route path="*" element={<NotFound />} />
           </Routes>
         </div>
       </main>

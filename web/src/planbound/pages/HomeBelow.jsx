@@ -9,7 +9,7 @@ const COLORS = { DENY: "#ff6f72", REVIEW: "#f1c34f", ALLOW: "#72e6a1", TRACE: "#
 const CAPTION = { DENY: "A firm stop.", REVIEW: "A human decision.", ALLOW: "Within the boundary.", TRACE: "Follow the evidence." };
 
 /** The original signal animation (site-ui.js `signal`): 2D canvas, <= 30 fps, only while visible. */
-function SignalCanvas({ type }) {
+export function SignalCanvas({ type }) {
   const ref = useRef(null);
   useEffect(() => {
     const canvas = ref.current, c = canvas.getContext("2d");
