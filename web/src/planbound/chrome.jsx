@@ -1,5 +1,5 @@
-import { useRef } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { useEffect, useRef } from "react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useTasks } from "./state/tasks";
 import { taskFacts } from "./lib/taskModel";
 
@@ -78,5 +78,35 @@ export function SiteFooter() {
       <div className="footer-notice">Local-first. Every task shown comes from the PlanReview backend. Real AWS apply is disabled. Cinematic sections are illustrations and are labelled as such.</div>
       <div className="footer-word" aria-hidden="true">PLANBOUND</div>
     </footer>
+  );
+}
+
+const KEYS = { h: "/", w: "/workspace", n: "/new", p: "/plan-review", e: "/evidence", i: "/how-it-works", a: "/about" };
+
+/** The original site's shortcuts: `g` then a letter navigates, `?` opens help (ignored while typing). */
+export function KeyboardNav() {
+  const nav = useNavigate();
+  const ref = useRef(null);
+  useEffect(() => {
+    let until = 0;
+    const onKey = (e) => {
+      if (e.ctrlKey || e.metaKey || e.altKey || e.target.isContentEditable || /INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) return;
+      if (e.key === "?") { e.preventDefault(); ref.current?.showModal(); return; }
+      if (e.key.toLowerCase() === "g") { until = performance.now() + 1200; return; }
+      if (performance.now() < until) {
+        until = 0;
+        const route = KEYS[e.key.toLowerCase()];
+        if (route) { e.preventDefault(); e.stopImmediatePropagation(); nav(route); }
+      }
+    };
+    document.addEventListener("keydown", onKey, true);
+    return () => document.removeEventListener("keydown", onKey, true);
+  }, [nav]);
+  return (
+    <dialog ref={ref} className="shortcut-dialog" aria-label="Keyboard shortcuts">
+      <span className="caption">KEYBOARD SHORTCUTS</span>
+      <p style={{ whiteSpace: "pre-line" }}>{"g then h / Home\ng then w / Workspace\ng then n / New task\ng then p / Plan Review (newest task)\ng then e / Evidence (newest task)\ng then i / How it works\ng then a / About\nM / Sound on or off\n? / This help\n\nIn Plan Review: j / k select a row, a approve, r reject, e explain."}</p>
+      <button className="site-button" onClick={() => ref.current.close()}>Close</button>
+    </dialog>
   );
 }

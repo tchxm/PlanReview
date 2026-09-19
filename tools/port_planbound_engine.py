@@ -20,6 +20,39 @@ def patch(name, code):
         code = code.replace("function tick(now){raf=0;if(document.hidden)return;", "function tick(now){raf=0;if(PB.disposed||document.hidden)return; // PORT: stop after dispose\n")
         code = code.replace("PB.wake=function(){if(!raf&&!document.hidden)raf=requestAnimationFrame(tick)}", "PB.wake=function(){if(!raf&&!document.hidden&&!PB.disposed)raf=requestAnimationFrame(tick)} // PORT: stop after dispose")
         assert "PB.disposed" in code
+    if name == "tree":
+        # Checkpoint C (targeted): make the original branching legible. Same growth, same geometry;
+        # only brightness, stem thickness and capillary visibility are raised.
+        def sub(old, new):
+            nonlocal_code = code_ref[0]
+            assert old in nonlocal_code, old
+            code_ref[0] = nonlocal_code.replace(old, new)
+        code_ref = [code]
+        sub("ri-lo))*.65:radius*(1-.75*f)", "ri-lo))*.85:radius*(1-.75*f)  /* PORT: slightly thicker stems */")
+        sub("?0.14:0.65", "?0.34:0.8 /* PORT: visible capillaries */")
+        sub("vec3(.40,.48,.30),vec3(.88,.91,.76)", "vec3(.50,.60,.38),vec3(.86,.90,.74)")
+        sub("float pulse=.50+.10*sin", "float pulse=.62+.12*sin")
+        # The original station card named sample resources (iam_role, security_group, s3_bucket).
+        # Those are not supported live edits, so the chips describe the verdict kinds instead.
+        sub("ALLOW · iam_role", "ALLOW · inside the contract")
+        sub("REVIEW · security_group", "REVIEW · a human decides")
+        sub("DENY · s3_bucket", "DENY · policy prohibits")
+        code = code_ref[0]
+    if name == "robot":
+        # Checkpoint C (targeted): the reference shows a ribbed turtleneck and rounded shoulder stumps.
+        def rep(old, new):
+            assert old in code_r[0], old
+            code_r[0] = code_r[0].replace(old, new)
+        code_r = [code]
+        rep("16*Math.sin(y*.7+x*.06)+(rng()-.5)*20", "4*Math.sin(y*.7+x*.06)+(rng()-.5)*8 /* PORT: ribs dominate */")
+        rep("bumpScale:.015", "bumpScale:.03")
+        rep("const collar=mesh(new THREE.TorusGeometry(.17,.03,12,40),knit,bust,0,-.15,-.03);collar.rotation.x=Math.PI/2;",
+            "const collar=mesh(new THREE.TorusGeometry(.17,.03,12,40),knit,bust,0,-.15,-.03);collar.rotation.x=Math.PI/2;"
+            "/* PORT: turtleneck + shoulder stumps */const tneck=mesh(new THREE.CylinderGeometry(.205,.25,.34,56,1,true),new THREE.MeshPhysicalMaterial({color:0x726069,roughness:.95,bumpMap:knitTex,bumpScale:.03,sheen:new THREE.Color(0x302b2d),side:THREE.DoubleSide}),bust,0,-.30,-.03);"
+            "for(const sx of [-1,1]){const st=mesh(new THREE.SphereGeometry(.2,40,28),knit,bust,sx*.74,-.70,-.03);st.scale.set(1.1,.75,.8)}")
+        rep("glyph=PB.store.get().gateOpen?'GATE: OPEN':'GATE: CLOSED';context.fillStyle=PB.store.get().gateOpen?'#72e6a1':'#ff6f72'",
+            "{const S=PB.store.get();glyph=S.robotText||(S.gateOpen?'GATE: OPEN':'GATE: CLOSED');context.fillStyle=S.robotColor||(S.gateOpen?'#72e6a1':'#ff6f72')} /* PORT: backend-fed status */")
+        code = code_r[0]
     return code
 
 for idx, name in MODULES.items():

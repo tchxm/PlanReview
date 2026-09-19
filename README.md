@@ -4,6 +4,10 @@ A local security checkpoint for Terraform changes. Confirm an immutable contract
 
 **Working locally:** real Terraform fixtures, deterministic and Cedar evaluation, FastAPI, SQLite audit, React/Tailwind console, local Ollama/Strands Terraform editing, blocked AWS apply proof, and successful local-resource apply proof. Docker-based emulator apply remains unavailable. See [STATUS.md](STATUS.md).
 
+## PlanBound frontend (Phase 3)
+
+`web/src/planbound/` is the original PlanBound experience (boot gate, globe, neural network, camera descent, tree, CRT reviewer) running against the real backend. The 3D engine in `engine/` is generated from `design/planbound-site.html` by `tools/port_planbound_engine.py` (bodies unchanged apart from marked `// PORT:` hooks) on three r128; the original CSS and markup are reused. Pages under `pages/` are backend-driven: Workspace, New task, Contract, Plan Review, Evidence, How it works, About. See [docs/phase3_visual_contract.md](docs/phase3_visual_contract.md). Cinematic sections are illustrations and are labelled; task data, verdicts, hashes, the gate and the audit come only from the backend. Real AWS apply is disabled.
+
 ## Architecture (Phase 2)
 
 ```text
@@ -35,7 +39,7 @@ Run each service in its own terminal:
 .\start-frontend.ps1   # Vite     -> http://127.0.0.1:5173
 ```
 
-There is no single-command launcher. Open <http://127.0.0.1:5173>. Check it works:
+There is no single-command launcher. Open <http://127.0.0.1:5173> for the PlanBound interface (hash routes such as `/#/workspace`). The earlier functional console is kept as a fallback at <http://127.0.0.1:5173/console.html>. Check it works:
 
 ```powershell
 curl.exe http://127.0.0.1:8000/api/health   # direct

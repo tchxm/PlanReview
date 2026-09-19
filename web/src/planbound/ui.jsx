@@ -3,7 +3,7 @@ import { describeError, ApiError } from "../api";
 
 // React versions of the original site-ui helpers, emitting the original markup and classes.
 
-export const Caption = ({ children }) => <span className="caption">{children}</span>;
+export const Caption = ({ children }) => <p className="site-caption">{children}</p>;
 
 export function Heading({ title, kicker, lede, back = ["/", "Home"] }) {
   return (
@@ -98,4 +98,14 @@ export function BackendOffline({ error, onRetry }) {
       {onRetry ? <button className="site-button" onClick={onRetry}>Retry</button> : null}
     </div>
   );
+}
+
+/** Show a factual status on the reviewer's CRT (backend-derived text only). Clears when text is null. */
+export function setRobotStatus(text, color) {
+  const PB = window.PB;
+  if (!PB?.store) return;
+  const S = PB.store.get();
+  S.robotText = text || null;
+  S.robotColor = color || null;
+  PB.bus.emit("gate", S.gateOpen);
 }

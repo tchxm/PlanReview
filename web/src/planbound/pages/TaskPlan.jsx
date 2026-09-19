@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api } from "../../api";
-import { Caption, ErrorBlock, Heading, JsonView, Loading, Stepper, VerdictBadge } from "../ui";
+import { Caption, ErrorBlock, Heading, JsonView, Loading, Stepper, VerdictBadge, setRobotStatus } from "../ui";
 import { useTask, useTasks } from "../state/tasks";
 import { fmt, isLive, modeLabel, shortHash, taskFacts, when } from "../lib/taskModel";
 
@@ -86,6 +86,14 @@ export default function TaskPlan() {
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
   }, []);
+
+  // The reviewer's screen mirrors backend facts and client activity. It never states a verdict of its own.
+  const rf = task ? taskFacts(task) : null;
+  const robotText = !task ? null : error || rf.hasFault ? "TECH FAULT" : busy && busy.kind === "agent" ? "PREPARING" : busy ? "INSPECTING" : rf.evaluated && !rf.counts.DENY && rf.awaiting.length ? "HUMAN NEEDED" : null;
+  useEffect(() => {
+    setRobotStatus(robotText, robotText === "TECH FAULT" ? "#ff4fa0" : robotText === "HUMAN NEEDED" ? "#f1c34f" : "#dfe6c9");
+    return () => setRobotStatus(null);
+  }, [robotText]);
 
   if (loadError) return <section className="subview"><Heading title="Task not found." kicker="PLAN REVIEW" back={["/workspace", "Workspace"]} /><ErrorBlock error={loadError} /><button className="site-button" onClick={reload}>Retry</button></section>;
   if (!task) return <section className="subview"><Heading title="Every change. A decision." kicker="02 / INSPECT" back={["/workspace", "Workspace"]} />{loading && <Loading />}</section>;

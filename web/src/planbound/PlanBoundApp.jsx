@@ -5,7 +5,7 @@ import { HOME_MARKUP } from "./home";
 import { startEngine } from "./engine";
 import { useTasks } from "./state/tasks";
 import { taskFacts } from "./lib/taskModel";
-import { Nav, SiteFooter, MenuDialog } from "./chrome";
+import { Nav, SiteFooter, MenuDialog, KeyboardNav } from "./chrome";
 import { HomeLive, HomeRecord } from "./pages/HomeLive";
 import HomeBelow from "./pages/HomeBelow";
 import { Workspace, NewTask } from "./pages/Tasks";
@@ -80,6 +80,7 @@ export default function PlanBoundApp() {
       <div dangerouslySetInnerHTML={shell} />
       <Nav />
       <MenuDialog />
+      <KeyboardNav />
       <main id="view" tabIndex={-1}>
         <div id="home-view" dangerouslySetInnerHTML={home} />
         <div id="route-view" hidden={path === "/"}>
