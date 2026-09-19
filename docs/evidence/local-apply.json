@@ -7,10 +7,10 @@
       "apply",
       "-input=false",
       "-no-color",
-      "C:\\Users\\kario\\AppData\\Local\\Temp\\pytest-of-kario\\pytest-82\\test_real_local_apply0\\plan.tfplan"
+      "C:\\Users\\kario\\AppData\\Local\\Temp\\pytest-of-kario\\pytest-85\\test_real_local_apply0\\plan.tfplan"
     ],
     "exit_code": 0,
-    "stdout": "terraform_data.proof: Creating...\nterraform_data.proof: Creation complete after 0s [id=d32b614d-45fc-aaea-7175-fac98ad2cec9]\n\nApply complete! Resources: 1 added, 0 changed, 0 destroyed.\n",
+    "stdout": "terraform_data.proof: Creating...\nterraform_data.proof: Creation complete after 0s [id=aedf56d0-a521-ded8-dd1c-d9bf2bbc95ba]\n\nApply complete! Resources: 1 added, 0 changed, 0 destroyed.\n",
     "stderr": ""
   },
   "state": {
@@ -27,7 +27,7 @@
             "provider_name": "terraform.io/builtin/terraform",
             "schema_version": 0,
             "values": {
-              "id": "d32b614d-45fc-aaea-7175-fac98ad2cec9",
+              "id": "aedf56d0-a521-ded8-dd1c-d9bf2bbc95ba",
               "input": "gate-verified",
               "output": "gate-verified",
               "store": null,
