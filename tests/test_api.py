@@ -78,3 +78,10 @@ def test_vite_origin_allowed_for_mutation(tmp_path, monkeypatch):
         headers={"Origin": "http://127.0.0.1:5173"},
     )
     assert r.status_code == 200
+
+
+def test_openapi_lists_task_endpoints():
+    schema = TestClient(api.app).get("/openapi.json").json()
+    assert schema["info"]["title"] == "PlanReview"
+    for path in ["/api/health", "/api/tasks", "/api/tasks/{id}/apply", "/api/tasks/{id}/audit"]:
+        assert path in schema["paths"], path

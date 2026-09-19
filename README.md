@@ -67,6 +67,7 @@ On Linux/macOS use `.venv/bin/python -m uvicorn engine.api:app --host 127.0.0.1 
 ```powershell
 .\.venv\Scripts\python.exe -m pytest -q   # backend (slow: real Terraform)
 cd web; npm test                              # frontend API-client tests (mocked fetch)
+.\.venv\Scripts\python.exe tools\test_phase2_smoke.py   # real FastAPI + Vite processes and /api proxy (ports 8000/5173 must be free)
 .\run-demo.ps1
 # Reproducible automation; approvals are marked as scripted demo actions:
 .\run-demo.ps1 -Scripted
