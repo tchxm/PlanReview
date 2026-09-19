@@ -1,0 +1,811 @@
+{
+  "checks": {
+    "lazy_non_webgl_entry": {
+      "pass": true,
+      "evidence": null
+    },
+    "empty_scope_rejected": {
+      "pass": true,
+      "evidence": null
+    },
+    "consent_required": {
+      "pass": true,
+      "evidence": null
+    },
+    "stable_hash_and_fnv": {
+      "pass": true,
+      "evidence": {
+        "stored": "749b14018525",
+        "recomputed": "749b14018525",
+        "fnv": "a430d84680aabd0b",
+        "allowed": [
+          "aws_s3_bucket",
+          "aws_security_group",
+          "aws_iam_role"
+        ]
+      }
+    },
+    "sample_a_three_verdicts": {
+      "pass": true,
+      "evidence": {
+        "chg_1": {
+          "verdict": "DENY",
+          "rule": "s3.public_acl",
+          "reason": "Public bucket ACL exposes data."
+        },
+        "chg_2": {
+          "verdict": "REVIEW",
+          "rule": "sg.open_ingress.dev",
+          "reason": "Unrestricted ingress needs human judgment."
+        },
+        "chg_3": {
+          "verdict": "ALLOW",
+          "rule": "within.boundary",
+          "reason": "Within the confirmed boundary."
+        }
+      }
+    },
+    "deny_cannot_be_approved": {
+      "pass": true,
+      "evidence": null
+    },
+    "deny_still_closes_gate": {
+      "pass": true,
+      "evidence": "1 of 3 changes need attention before applying."
+    },
+    "clean_plan_opens_gate": {
+      "pass": true,
+      "evidence": null
+    },
+    "apply_records": {
+      "pass": true,
+      "evidence": null
+    },
+    "invalid_json_fails_closed": {
+      "pass": true,
+      "evidence": null
+    },
+    "pasted_content_escaped": {
+      "pass": true,
+      "evidence": null
+    },
+    "rejected_review_excluded": {
+      "pass": true,
+      "evidence": "1 rejected change excluded. Remaining changes are ready."
+    },
+    "resolution_not_replayed": {
+      "pass": true,
+      "evidence": null
+    },
+    "evidence_filter": {
+      "pass": true,
+      "evidence": null
+    },
+    "download_valid_filtered_json": {
+      "pass": true,
+      "evidence": null
+    },
+    "evidence_detail": {
+      "pass": true,
+      "evidence": null
+    },
+    "copy_json": {
+      "pass": true,
+      "evidence": "JSON copied."
+    },
+    "empty_evidence_state": {
+      "pass": true,
+      "evidence": null
+    },
+    "sample_c_prod": {
+      "pass": true,
+      "evidence": {
+        "chg_1": {
+          "verdict": "REVIEW",
+          "rule": "stateful.destructive",
+          "reason": "Destructive change to stateful resource."
+        },
+        "chg_2": {
+          "verdict": "DENY",
+          "rule": "sg.open_ingress.prod",
+          "reason": "Open ingress is prohibited in prod."
+        }
+      }
+    },
+    "all_routes_no_overflow": {
+      "pass": true,
+      "evidence": {
+        "1440/": {
+          "overflow": false,
+          "title": "PlanBound \u2014 From change to confidence",
+          "focus": "view",
+          "announcement": "PlanBound \u2014 From change to confidence"
+        },
+        "1440/how-it-works": {
+          "overflow": false,
+          "title": "PlanBound \u2014 How it works",
+          "focus": "view",
+          "announcement": "PlanBound \u2014 How it works"
+        },
+        "1440/contract": {
+          "overflow": false,
+          "title": "PlanBound \u2014 Contract",
+          "focus": "view",
+          "announcement": "PlanBound \u2014 Contract"
+        },
+        "1440/plan-review": {
+          "overflow": false,
+          "title": "PlanBound \u2014 Plan Review",
+          "focus": "view",
+          "announcement": "PlanBound \u2014 Plan Review"
+        },
+        "1440/evidence": {
+          "overflow": false,
+          "title": "PlanBound \u2014 Evidence",
+          "focus": "view",
+          "announcement": "PlanBound \u2014 Evidence"
+        },
+        "1440/about": {
+          "overflow": false,
+          "title": "PlanBound \u2014 About",
+          "focus": "view",
+          "announcement": "PlanBound \u2014 About"
+        },
+        "1440/legal": {
+          "overflow": false,
+          "title": "PlanBound \u2014 Legal",
+          "focus": "view",
+          "announcement": "PlanBound \u2014 Legal"
+        },
+        "1440/outside": {
+          "overflow": false,
+          "title": "PlanBound \u2014 Outside the boundary",
+          "focus": "view",
+          "announcement": "PlanBound \u2014 Outside the boundary"
+        },
+        "390/": {
+          "overflow": false,
+          "title": "PlanBound \u2014 From change to confidence",
+          "focus": "view",
+          "announcement": "PlanBound \u2014 From change to confidence"
+        },
+        "390/how-it-works": {
+          "overflow": false,
+          "title": "PlanBound \u2014 How it works",
+          "focus": "view",
+          "announcement": "PlanBound \u2014 How it works"
+        },
+        "390/contract": {
+          "overflow": false,
+          "title": "PlanBound \u2014 Contract",
+          "focus": "view",
+          "announcement": "PlanBound \u2014 Contract"
+        },
+        "390/plan-review": {
+          "overflow": false,
+          "title": "PlanBound \u2014 Plan Review",
+          "focus": "view",
+          "announcement": "PlanBound \u2014 Plan Review"
+        },
+        "390/evidence": {
+          "overflow": false,
+          "title": "PlanBound \u2014 Evidence",
+          "focus": "view",
+          "announcement": "PlanBound \u2014 Evidence"
+        },
+        "390/about": {
+          "overflow": false,
+          "title": "PlanBound \u2014 About",
+          "focus": "view",
+          "announcement": "PlanBound \u2014 About"
+        },
+        "390/legal": {
+          "overflow": false,
+          "title": "PlanBound \u2014 Legal",
+          "focus": "view",
+          "announcement": "PlanBound \u2014 Legal"
+        },
+        "390/outside": {
+          "overflow": false,
+          "title": "PlanBound \u2014 Outside the boundary",
+          "focus": "view",
+          "announcement": "PlanBound \u2014 Outside the boundary"
+        }
+      }
+    },
+    "history_back_forward": {
+      "pass": true,
+      "evidence": null
+    },
+    "keyboard_route_focus": {
+      "pass": true,
+      "evidence": null
+    },
+    "shortcut_dialog": {
+      "pass": true,
+      "evidence": null
+    },
+    "tree_store_coherence": {
+      "pass": true,
+      "evidence": null
+    },
+    "singleton_robot": {
+      "pass": true,
+      "evidence": null
+    },
+    "twenty_navigation_no_growth": {
+      "pass": true,
+      "evidence": {
+        "before": {
+          "frames": 8,
+          "busListeners": 7,
+          "subscribers": 1,
+          "heroInits": 1,
+          "heroDisposals": 0,
+          "activeContext": null,
+          "hero": {
+            "geometries": 25,
+            "textures": 13
+          },
+          "robot": {
+            "geometries": 33,
+            "textures": 4
+          }
+        },
+        "after": {
+          "frames": 8,
+          "busListeners": 7,
+          "subscribers": 1,
+          "heroInits": 1,
+          "heroDisposals": 0,
+          "activeContext": null,
+          "hero": {
+            "geometries": 25,
+            "textures": 13
+          },
+          "robot": {
+            "geometries": 33,
+            "textures": 4
+          }
+        }
+      }
+    },
+    "one_animating_context": {
+      "pass": true,
+      "evidence": 1
+    },
+    "hero_disposed_after_60s": {
+      "pass": true,
+      "evidence": {
+        "frames": 7,
+        "busListeners": 6,
+        "subscribers": 1,
+        "heroInits": 1,
+        "heroDisposals": 1,
+        "activeContext": null,
+        "hero": null,
+        "robot": {
+          "geometries": 33,
+          "textures": 4
+        }
+      }
+    },
+    "hero_recreated_robot_retained": {
+      "pass": true,
+      "evidence": {
+        "frames": 15,
+        "busListeners": 7,
+        "subscribers": 2,
+        "heroInits": 2,
+        "heroDisposals": 1,
+        "activeContext": "hero",
+        "hero": {
+          "geometries": 11,
+          "textures": 13
+        },
+        "robot": {
+          "geometries": 33,
+          "textures": 4
+        }
+      }
+    },
+    "notice_dismissed": {
+      "pass": true,
+      "evidence": null
+    }
+  },
+  "routes": {
+    "1440/": {
+      "overflow": false,
+      "title": "PlanBound \u2014 From change to confidence",
+      "focus": "view",
+      "announcement": "PlanBound \u2014 From change to confidence"
+    },
+    "1440/how-it-works": {
+      "overflow": false,
+      "title": "PlanBound \u2014 How it works",
+      "focus": "view",
+      "announcement": "PlanBound \u2014 How it works"
+    },
+    "1440/contract": {
+      "overflow": false,
+      "title": "PlanBound \u2014 Contract",
+      "focus": "view",
+      "announcement": "PlanBound \u2014 Contract"
+    },
+    "1440/plan-review": {
+      "overflow": false,
+      "title": "PlanBound \u2014 Plan Review",
+      "focus": "view",
+      "announcement": "PlanBound \u2014 Plan Review"
+    },
+    "1440/evidence": {
+      "overflow": false,
+      "title": "PlanBound \u2014 Evidence",
+      "focus": "view",
+      "announcement": "PlanBound \u2014 Evidence"
+    },
+    "1440/about": {
+      "overflow": false,
+      "title": "PlanBound \u2014 About",
+      "focus": "view",
+      "announcement": "PlanBound \u2014 About"
+    },
+    "1440/legal": {
+      "overflow": false,
+      "title": "PlanBound \u2014 Legal",
+      "focus": "view",
+      "announcement": "PlanBound \u2014 Legal"
+    },
+    "1440/outside": {
+      "overflow": false,
+      "title": "PlanBound \u2014 Outside the boundary",
+      "focus": "view",
+      "announcement": "PlanBound \u2014 Outside the boundary"
+    },
+    "390/": {
+      "overflow": false,
+      "title": "PlanBound \u2014 From change to confidence",
+      "focus": "view",
+      "announcement": "PlanBound \u2014 From change to confidence"
+    },
+    "390/how-it-works": {
+      "overflow": false,
+      "title": "PlanBound \u2014 How it works",
+      "focus": "view",
+      "announcement": "PlanBound \u2014 How it works"
+    },
+    "390/contract": {
+      "overflow": false,
+      "title": "PlanBound \u2014 Contract",
+      "focus": "view",
+      "announcement": "PlanBound \u2014 Contract"
+    },
+    "390/plan-review": {
+      "overflow": false,
+      "title": "PlanBound \u2014 Plan Review",
+      "focus": "view",
+      "announcement": "PlanBound \u2014 Plan Review"
+    },
+    "390/evidence": {
+      "overflow": false,
+      "title": "PlanBound \u2014 Evidence",
+      "focus": "view",
+      "announcement": "PlanBound \u2014 Evidence"
+    },
+    "390/about": {
+      "overflow": false,
+      "title": "PlanBound \u2014 About",
+      "focus": "view",
+      "announcement": "PlanBound \u2014 About"
+    },
+    "390/legal": {
+      "overflow": false,
+      "title": "PlanBound \u2014 Legal",
+      "focus": "view",
+      "announcement": "PlanBound \u2014 Legal"
+    },
+    "390/outside": {
+      "overflow": false,
+      "title": "PlanBound \u2014 Outside the boundary",
+      "focus": "view",
+      "announcement": "PlanBound \u2014 Outside the boundary"
+    }
+  },
+  "console": [],
+  "continuity": {
+    "positionError": 1.1102230246251565e-15,
+    "lookError": 2.220446049250313e-16,
+    "original": {
+      "position": [
+        0.53,
+        -0.18,
+        -1.200000000000001
+      ],
+      "look": [
+        1.9299999999999997,
+        0.05,
+        -2.7
+      ]
+    },
+    "railStart": [
+      0.53,
+      -0.18,
+      -1.2
+    ],
+    "railLook": [
+      1.93,
+      0.05,
+      -2.7
+    ]
+  },
+  "lifecycle": {
+    "before": {
+      "frames": 8,
+      "busListeners": 7,
+      "subscribers": 1,
+      "heroInits": 1,
+      "heroDisposals": 0,
+      "activeContext": null,
+      "hero": {
+        "geometries": 25,
+        "textures": 13
+      },
+      "robot": {
+        "geometries": 33,
+        "textures": 4
+      }
+    },
+    "after": {
+      "frames": 8,
+      "busListeners": 7,
+      "subscribers": 1,
+      "heroInits": 1,
+      "heroDisposals": 0,
+      "activeContext": null,
+      "hero": {
+        "geometries": 25,
+        "textures": 13
+      },
+      "robot": {
+        "geometries": 33,
+        "textures": 4
+      }
+    },
+    "snapshots": [
+      {
+        "frames": 15,
+        "busListeners": 7,
+        "subscribers": 2,
+        "heroInits": 1,
+        "heroDisposals": 0,
+        "activeContext": "hero",
+        "hero": {
+          "geometries": 25,
+          "textures": 13
+        },
+        "robot": {
+          "geometries": 33,
+          "textures": 4
+        }
+      },
+      {
+        "frames": 8,
+        "busListeners": 7,
+        "subscribers": 2,
+        "heroInits": 1,
+        "heroDisposals": 0,
+        "activeContext": "robot",
+        "hero": {
+          "geometries": 25,
+          "textures": 13
+        },
+        "robot": {
+          "geometries": 33,
+          "textures": 4
+        }
+      },
+      {
+        "frames": 8,
+        "busListeners": 7,
+        "subscribers": 2,
+        "heroInits": 1,
+        "heroDisposals": 0,
+        "activeContext": null,
+        "hero": {
+          "geometries": 25,
+          "textures": 13
+        },
+        "robot": {
+          "geometries": 33,
+          "textures": 4
+        }
+      },
+      {
+        "frames": 8,
+        "busListeners": 7,
+        "subscribers": 1,
+        "heroInits": 1,
+        "heroDisposals": 0,
+        "activeContext": null,
+        "hero": {
+          "geometries": 25,
+          "textures": 13
+        },
+        "robot": {
+          "geometries": 33,
+          "textures": 4
+        }
+      },
+      {
+        "frames": 15,
+        "busListeners": 7,
+        "subscribers": 2,
+        "heroInits": 1,
+        "heroDisposals": 0,
+        "activeContext": "hero",
+        "hero": {
+          "geometries": 25,
+          "textures": 13
+        },
+        "robot": {
+          "geometries": 33,
+          "textures": 4
+        }
+      },
+      {
+        "frames": 8,
+        "busListeners": 7,
+        "subscribers": 2,
+        "heroInits": 1,
+        "heroDisposals": 0,
+        "activeContext": "robot",
+        "hero": {
+          "geometries": 25,
+          "textures": 13
+        },
+        "robot": {
+          "geometries": 33,
+          "textures": 4
+        }
+      },
+      {
+        "frames": 8,
+        "busListeners": 7,
+        "subscribers": 2,
+        "heroInits": 1,
+        "heroDisposals": 0,
+        "activeContext": null,
+        "hero": {
+          "geometries": 25,
+          "textures": 13
+        },
+        "robot": {
+          "geometries": 33,
+          "textures": 4
+        }
+      },
+      {
+        "frames": 8,
+        "busListeners": 7,
+        "subscribers": 1,
+        "heroInits": 1,
+        "heroDisposals": 0,
+        "activeContext": null,
+        "hero": {
+          "geometries": 25,
+          "textures": 13
+        },
+        "robot": {
+          "geometries": 33,
+          "textures": 4
+        }
+      },
+      {
+        "frames": 15,
+        "busListeners": 7,
+        "subscribers": 2,
+        "heroInits": 1,
+        "heroDisposals": 0,
+        "activeContext": "hero",
+        "hero": {
+          "geometries": 25,
+          "textures": 13
+        },
+        "robot": {
+          "geometries": 33,
+          "textures": 4
+        }
+      },
+      {
+        "frames": 8,
+        "busListeners": 7,
+        "subscribers": 2,
+        "heroInits": 1,
+        "heroDisposals": 0,
+        "activeContext": "robot",
+        "hero": {
+          "geometries": 25,
+          "textures": 13
+        },
+        "robot": {
+          "geometries": 33,
+          "textures": 4
+        }
+      },
+      {
+        "frames": 8,
+        "busListeners": 7,
+        "subscribers": 2,
+        "heroInits": 1,
+        "heroDisposals": 0,
+        "activeContext": null,
+        "hero": {
+          "geometries": 25,
+          "textures": 13
+        },
+        "robot": {
+          "geometries": 33,
+          "textures": 4
+        }
+      },
+      {
+        "frames": 8,
+        "busListeners": 7,
+        "subscribers": 1,
+        "heroInits": 1,
+        "heroDisposals": 0,
+        "activeContext": null,
+        "hero": {
+          "geometries": 25,
+          "textures": 13
+        },
+        "robot": {
+          "geometries": 33,
+          "textures": 4
+        }
+      },
+      {
+        "frames": 15,
+        "busListeners": 7,
+        "subscribers": 2,
+        "heroInits": 1,
+        "heroDisposals": 0,
+        "activeContext": "hero",
+        "hero": {
+          "geometries": 25,
+          "textures": 13
+        },
+        "robot": {
+          "geometries": 33,
+          "textures": 4
+        }
+      },
+      {
+        "frames": 8,
+        "busListeners": 7,
+        "subscribers": 2,
+        "heroInits": 1,
+        "heroDisposals": 0,
+        "activeContext": "robot",
+        "hero": {
+          "geometries": 25,
+          "textures": 13
+        },
+        "robot": {
+          "geometries": 33,
+          "textures": 4
+        }
+      },
+      {
+        "frames": 8,
+        "busListeners": 7,
+        "subscribers": 2,
+        "heroInits": 1,
+        "heroDisposals": 0,
+        "activeContext": null,
+        "hero": {
+          "geometries": 25,
+          "textures": 13
+        },
+        "robot": {
+          "geometries": 33,
+          "textures": 4
+        }
+      },
+      {
+        "frames": 8,
+        "busListeners": 7,
+        "subscribers": 1,
+        "heroInits": 1,
+        "heroDisposals": 0,
+        "activeContext": null,
+        "hero": {
+          "geometries": 25,
+          "textures": 13
+        },
+        "robot": {
+          "geometries": 33,
+          "textures": 4
+        }
+      },
+      {
+        "frames": 15,
+        "busListeners": 7,
+        "subscribers": 2,
+        "heroInits": 1,
+        "heroDisposals": 0,
+        "activeContext": "hero",
+        "hero": {
+          "geometries": 25,
+          "textures": 13
+        },
+        "robot": {
+          "geometries": 33,
+          "textures": 4
+        }
+      },
+      {
+        "frames": 8,
+        "busListeners": 7,
+        "subscribers": 2,
+        "heroInits": 1,
+        "heroDisposals": 0,
+        "activeContext": "robot",
+        "hero": {
+          "geometries": 25,
+          "textures": 13
+        },
+        "robot": {
+          "geometries": 33,
+          "textures": 4
+        }
+      },
+      {
+        "frames": 8,
+        "busListeners": 7,
+        "subscribers": 2,
+        "heroInits": 1,
+        "heroDisposals": 0,
+        "activeContext": null,
+        "hero": {
+          "geometries": 25,
+          "textures": 13
+        },
+        "robot": {
+          "geometries": 33,
+          "textures": 4
+        }
+      },
+      {
+        "frames": 8,
+        "busListeners": 7,
+        "subscribers": 1,
+        "heroInits": 1,
+        "heroDisposals": 0,
+        "activeContext": null,
+        "hero": {
+          "geometries": 25,
+          "textures": 13
+        },
+        "robot": {
+          "geometries": 33,
+          "textures": 4
+        }
+      }
+    ]
+  },
+  "cpu4x": {
+    "mean": 6.87583333333411,
+    "max": 7.899999999994179
+  },
+  "errors": [],
+  "reduced": {
+    "reduced": true,
+    "confirmed": true,
+    "errors": [],
+    "overflow": false
+  },
+  "file_bytes": 163651,
+  "sha256": "af58e20e2482cef6bb832672d33bdc61e5cffec299af266fcc80b1c08357c352"
+}

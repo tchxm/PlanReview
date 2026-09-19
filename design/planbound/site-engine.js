@@ -1,0 +1,54 @@
+(function(){
+'use strict';
+const PB=window.PB,clone=x=>JSON.parse(JSON.stringify(x));
+const classes=['aws_s3_bucket','aws_security_group','aws_iam_role','aws_db_instance','aws_lambda_function'];
+const blank=()=>({environment:'dev',allowed:classes.slice(0,3),maxBlast:5,note:'',confirmed:false,hash:null,confirmedAt:null});
+const change=(id,resource,name,before,after,op='update',stateful=false,blast=1)=>({id,resource,name,op,before,after,attrs:{stateful,blast}});
+const plans={
+ 'sample-a':[change('chg_1','aws_s3_bucket','app-logs-bucket',{acl:'private'},{acl:'public-read'}),change('chg_2','aws_security_group','web-sg',{cidr_blocks:['10.0.0.0/16']},{cidr_blocks:['0.0.0.0/0']}),change('chg_3','aws_iam_role','ec2-role',{policy:'AmazonS3FullAccess'},{policy:'AmazonS3ReadOnlyAccess'})],
+ 'sample-b':[change('chg_1','aws_s3_bucket','app-logs-bucket',{acl:'public-read'},{acl:'private',block_public_access:true}),change('chg_2','aws_security_group','web-sg',{cidr_blocks:['0.0.0.0/0']},{cidr_blocks:['10.0.0.0/16']}),change('chg_3','aws_iam_role','ec2-role',{policy:'AmazonS3FullAccess'},{policy:'AmazonS3ReadOnlyAccess'}),change('chg_4','aws_s3_bucket','artifacts',{versioning:false},{versioning:true})],
+ 'sample-c':[change('chg_1','aws_db_instance','orders-prod',{storage:20},{storage:40},'replace',true,3),change('chg_2','aws_security_group','prod-api',{cidr_blocks:['10.0.0.0/16']},{cidr_blocks:['0.0.0.0/0']})]
+};
+const V=(verdict,rule,reason)=>({verdict,rule,reason});
+/** Evaluate one sample change using ordered, inspectable browser rules. */
+function evaluate(chg,c){
+ if(!c.confirmed)return V('DENY','contract.unconfirmed','No confirmed boundary exists.');
+ if(!c.allowed.includes(chg.resource))return V('DENY','scope.resource_class',chg.resource+' is outside the confirmed scope.');
+ if(['public-read','public-read-write'].includes(chg.after?.acl))return V('DENY','s3.public_acl','Public bucket ACL exposes data.');
+ if(chg.resource==='aws_security_group'&&JSON.stringify(chg.after).includes('0.0.0.0/0'))return c.environment==='prod'?V('DENY','sg.open_ingress.prod','Open ingress is prohibited in prod.'):V('REVIEW','sg.open_ingress.dev','Unrestricted ingress needs human judgment.');
+ if(chg.resource==='aws_iam_role'&&/FullAccess|AdministratorAccess/.test(JSON.stringify(chg.after)))return V('DENY','iam.excess','Excessive permissions.');
+ if(chg.attrs.stateful&&['delete','replace'].includes(chg.op))return V('REVIEW','stateful.destructive','Destructive change to stateful resource.');
+ if(chg.attrs.blast>c.maxBlast)return V('REVIEW','blast.radius','Blast radius exceeds contract limit.');
+ return V('ALLOW','within.boundary','Within the confirmed boundary.');
+}
+/** Stable FNV-1a 64-bit fingerprint; used when Web Crypto is unavailable. */
+function fnv(text){let n=0xcbf29ce484222325n;for(const byte of new TextEncoder().encode(text)){n^=BigInt(byte);n=BigInt.asUintN(64,n*0x100000001b3n)}return n.toString(16).padStart(16,'0')}
+function canonical(c){return {environment:c.environment,allowed:[...c.allowed].sort(),maxBlast:c.maxBlast,note:c.note,confirmed:!!c.confirmed}}
+/** Hash contract fields, excluding only hash and confirmation timestamp. */
+async function hash(c){const text=JSON.stringify(canonical(c));if(globalThis.crypto?.subtle){const bytes=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(text));return Array.from(new Uint8Array(bytes),v=>v.toString(16).padStart(2,'0')).join('').slice(0,12)}return fnv(text).slice(0,12)}
+function validateContract(c){if(!c||!['dev','staging','prod'].includes(c.environment)||!Array.isArray(c.allowed)||!c.allowed.length||c.allowed.some(x=>!classes.includes(x))||new Set(c.allowed).size!==c.allowed.length||!Number.isInteger(c.maxBlast)||c.maxBlast<1||c.maxBlast>10||typeof c.note!=='string'||c.note.length>240)throw Error('Select at least one resource class and use a task note of 240 characters or fewer.');return c}
+/** Validate and normalize an untrusted pasted plan without coercive defaults. */
+function validatePlan(input){if(!Array.isArray(input)||input.length<1||input.length>100)throw Error('Provide an array of 1–100 changes.');const ids=new Set();return input.map((c,i)=>{if(!c||typeof c!=='object'||Array.isArray(c))throw Error('Change '+(i+1)+' must be an object.');for(const k of ['id','resource','name'])if(typeof c[k]!=='string'||!c[k].trim()||c[k].length>180)throw Error('Change '+(i+1)+' needs a short '+k+'.');if(ids.has(c.id))throw Error('Change IDs must be unique.');ids.add(c.id);if(!['create','update','delete','replace'].includes(c.op))throw Error('Use create, update, delete or replace.');for(const k of ['before','after'])if(c[k]!==null&&(typeof c[k]!=='object'||Array.isArray(c[k])))throw Error(k+' must be an object or null.');if(!c.attrs||typeof c.attrs.stateful!=='boolean'||!Number.isFinite(c.attrs.blast)||c.attrs.blast<0)throw Error('Each change needs attrs.stateful (boolean) and attrs.blast (nonnegative number).');return clone({id:c.id,resource:c.resource,name:c.name,op:c.op,before:c.before,after:c.after,attrs:{stateful:c.attrs.stateful,blast:c.attrs.blast}})})}
+let s={contract:blank(),planId:'sample-a',changes:clone(plans['sample-a']),resolutions:{},verdicts:{},gateOpen:false,records:[],metrics:{plansEvaluated:4,changesGated:8,humanDecisions:0},wizardStep:1,consent:false,appliedScope:null};
+const subs=new Set();let seq=0;
+const planKey=()=>fnv(JSON.stringify(s.changes));
+const scope=()=>String(s.contract.hash||'unconfirmed')+':'+planKey();
+const resolution=id=>s.resolutions[scope()+':'+id]||null;
+function deepFreeze(v){if(v&&typeof v==='object'&&!Object.isFrozen(v)){Object.freeze(v);Object.values(v).forEach(deepFreeze)}return v}
+function derive(){const verdicts={};s.changes.forEach(c=>verdicts[c.id]=evaluate(c,s.contract));s={...s,verdicts,planHash:planKey()};s.gateOpen=s.contract.confirmed&&s.changes.length>0&&s.changes.every(c=>verdicts[c.id].verdict==='ALLOW'||(verdicts[c.id].verdict==='REVIEW'&&['approved','rejected'].includes(resolution(c.id))));}
+function persist(){try{sessionStorage.setItem('planbound.site.v2',JSON.stringify({contract:s.contract,planId:s.planId,resolutions:s.resolutions}))}catch(e){PB.storageUnavailable=true}}
+function record(chg,v,event='evaluated',seed=false){const resolved=resolution(chg.id);return {id:++seq,status:event==='applied'?'applied':event==='resolved'?resolved:v.verdict.toLowerCase(),verdict:v.verdict,event,sample_data:true,seed,timestamp:Math.floor(Date.now()/1000)-(seed?(13-seq)*1800:0),plan:{id:s.planId,hash:s.planHash},contract:clone(s.contract),change_0:{resource:chg.resource+'.'+chg.name,op:chg.op,rule:v.rule,verdict:v.verdict},change:clone(chg),reason:v.reason,evidence:{checked_against:v.rule,blast:chg.attrs.blast,max_blast:s.contract.maxBlast},resolution:resolved,approval:{intent_confirmed:s.contract.confirmed,plan_evaluated:true,human_resolved:v.verdict==='ALLOW'||!!resolved}}}
+function append(records){s={...s,records:[...s.records,...records].slice(-200)}}
+function publish(previousGate){deepFreeze(s);persist();subs.forEach(f=>f(s));if(previousGate!==s.gateOpen){PB.bus.emit('gate',s.gateOpen);PB.audio?.tick()}}
+/** Shared immutable snapshots; every mutation derives verdicts and gate. */
+PB.store={get:()=>s,set(patch){const old=s.gateOpen;s={...s,...clone(patch)};derive();publish(old)},subscribe(f){subs.add(f);return()=>subs.delete(f)},subscriberCount:()=>subs.size};
+PB.engine={classes,plans,evaluate,hash,fnv,scope,resolution,validatePlan,validateContract,
+ draft(patch){const c={...s.contract,...patch,confirmed:false,hash:null,confirmedAt:null};PB.store.set({contract:c,consent:false,wizardStep:1,appliedScope:null})},
+ reset(){PB.store.set({contract:blank(),consent:false,wizardStep:1,appliedScope:null})},
+ async confirm(){validateContract(s.contract);if(!s.consent)throw Error('Confirm the consent checkbox before submitting.');const c={...clone(s.contract),confirmed:true,confirmedAt:new Date().toISOString()};c.hash=await hash(c);const old=s.gateOpen;s={...s,contract:c,wizardStep:3,appliedScope:null};derive();append(s.changes.map(chg=>record(chg,s.verdicts[chg.id])));s.metrics={...s.metrics,plansEvaluated:s.metrics.plansEvaluated+1,changesGated:s.metrics.changesGated+Object.values(s.verdicts).filter(v=>v.verdict!=='ALLOW').length};publish(old)},
+ load(id,input){const changes=validatePlan(input||plans[id]);const old=s.gateOpen;s={...s,planId:id,changes,appliedScope:null};derive();append(changes.map(c=>record(c,s.verdicts[c.id])));s.metrics={...s.metrics,plansEvaluated:s.metrics.plansEvaluated+1,changesGated:s.metrics.changesGated+Object.values(s.verdicts).filter(v=>v.verdict!=='ALLOW').length};publish(old)},
+ resolve(id,choice){if(!['approved','rejected'].includes(choice)||s.verdicts[id]?.verdict!=='REVIEW')return false;const old=s.gateOpen;s={...s,resolutions:{...s.resolutions,[scope()+':'+id]:choice},appliedScope:null};derive();const c=s.changes.find(c=>c.id===id);append([record(c,s.verdicts[id],'resolved')]);s.metrics={...s.metrics,humanDecisions:s.metrics.humanDecisions+1};publish(old);return true},
+ apply(){if(!s.gateOpen||s.appliedScope===scope())return false;const old=s.gateOpen;const selected=s.changes.filter(c=>resolution(c.id)!=='rejected');if(selected.length)append(selected.map(c=>record(c,s.verdicts[c.id],'applied')));else{const event=record(change('empty-apply-set','apply_set','empty',null,null,'none'),V('ALLOW','apply.empty_set','No resources applied. All proposed changes were explicitly rejected.'),'applied');event.included=[];event.excluded=s.changes.map(c=>c.id);append([event])}s={...s,appliedScope:scope()};publish(old);return true},
+ async init(){try{const saved=JSON.parse(sessionStorage.getItem('planbound.site.v2')||'null');if(saved){validateContract(saved.contract);if(saved.contract.confirmed&&await hash(saved.contract)!==saved.contract.hash)throw Error('Saved boundary hash does not match.');s={...s,contract:saved.contract,planId:plans[saved.planId]?saved.planId:'sample-a',resolutions:saved.resolutions&&typeof saved.resolutions==='object'?saved.resolutions:{},wizardStep:saved.contract.confirmed?3:1};s.changes=clone(plans[s.planId])}}catch(e){PB.restoreNotice='The saved session was unavailable or invalid. A fresh boundary is ready.'}derive();const original=s,seedContract={...blank(),confirmed:true,confirmedAt:'2026-09-19T00:00:00.000Z'};seedContract.hash=await hash(seedContract);s={...s,contract:seedContract,planId:'sample-a',changes:clone(plans['sample-a']),resolutions:{}};derive();for(let i=0;i<12;i++){const c=plans['sample-a'][i%3];append([record(c,evaluate(c,s.contract),'evaluated',true)])}s={...original,records:s.records};derive();append(s.changes.map(c=>record(c,s.verdicts[c.id])));s.metrics={...s.metrics,plansEvaluated:s.metrics.plansEvaluated+1,changesGated:s.metrics.changesGated+Object.values(s.verdicts).filter(v=>v.verdict!=='ALLOW').length};publish(false)}
+};
+})();
