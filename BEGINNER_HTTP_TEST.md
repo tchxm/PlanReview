@@ -7,14 +7,14 @@ This is the easiest way to check that PlanReview works. You are not applying any
 In PowerShell, from the `PlanReview` folder, start the server:
 
 ```powershell
-.\.venv\Scripts\python.exe -m uvicorn engine.api:app --host 127.0.0.1 --port 8000
+.\start.ps1
 ```
 
-Wait for `Uvicorn running on http://127.0.0.1:8000`.
+Wait for `Uvicorn running on http://127.0.0.1:8000`. In a second PowerShell window, run `.\start-frontend.ps1` and wait for the Vite `Local:` line.
 
 ## In the browser
 
-Open `http://127.0.0.1:8000`.
+Open `http://127.0.0.1:5173` (the API alone is on port 8000 and does not serve the console).
 
 1. On **Create task**, leave **Replay** selected. Click **Create task**.
    - Expected: you see **Confirm contract**.

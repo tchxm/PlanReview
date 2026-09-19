@@ -44,3 +44,37 @@ def test_cross_origin_blocked():
         ).status_code
         == 403
     )
+
+
+def test_api_is_independent_of_frontend_build(monkeypatch):
+    # Phase 2: the API never serves the frontend; there is no static mount.
+    from starlette.staticfiles import StaticFiles
+
+    assert not any(
+        isinstance(getattr(r, "app", None), StaticFiles) for r in api.app.routes
+    )
+    client = TestClient(api.app)
+    h = client.get("/api/health").json()
+    assert h["status"] == "ok" and h["cloud_apply"] is False
+    assert client.get("/openapi.json").status_code == 200
+    assert client.get("/docs").status_code == 200
+
+
+def test_unknown_routes_are_json_404_not_html():
+    client = TestClient(api.app)
+    for path in ["/api/nope", "/api/tasks/x/nope", "/", "/index.html"]:
+        r = client.get(path)
+        assert r.status_code == 404, path
+        assert r.headers["content-type"].startswith("application/json"), path
+        assert "<html" not in r.text.lower()
+
+
+def test_vite_origin_allowed_for_mutation(tmp_path, monkeypatch):
+    monkeypatch.setattr(api, "pipeline", Pipeline(tmp_path))
+    client = TestClient(api.app)
+    r = client.post(
+        "/api/tasks",
+        json={"task": "Increase dev-api Lambda memory"},
+        headers={"Origin": "http://127.0.0.1:5173"},
+    )
+    assert r.status_code == 200

@@ -499,6 +499,12 @@ select {
   border-color: #ff4d4f30;
   background: #ff4d4f0a;
 }
+.badge.evaluation_error {
+  color: var(--deny);
+  border-color: #ff4d4f60;
+  border-style: dashed;
+  background: #ff4d4f14;
+}
 .task-strip {
   display: flex;
   align-items: center;
@@ -624,6 +630,9 @@ select {
 }
 .verdict-row.review {
   --verdict: var(--review);
+}
+.verdict-row.evaluation_error {
+  --verdict: var(--deny);
 }
 .verdict-row.deny {
   --verdict: var(--deny);

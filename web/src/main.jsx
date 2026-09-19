@@ -18,6 +18,7 @@ import {
   Copy,
   ExternalLink,
 } from "lucide-react";
+import { api, describeError } from "./api";
 import "./styles.css";
 
 const steps = [
@@ -30,16 +31,6 @@ const steps = [
 const icons = [Plus, Lock, Layers, Check, History];
 const short = (v) =>
   v === null ? "null" : typeof v === "object" ? JSON.stringify(v) : String(v);
-async function api(path, body) {
-  const r = await fetch("/api" + path, {
-    method: body === undefined ? "GET" : "POST",
-    headers: { "Content-Type": "application/json" },
-    body: body === undefined ? undefined : JSON.stringify(body),
-  });
-  const data = await r.json();
-  if (!r.ok) throw Error(data.detail || "Request failed");
-  return data;
-}
 function Badge({ value }) {
   return (
     <span className={"badge " + value.toLowerCase()}>
@@ -69,10 +60,15 @@ function App() {
   const unresolved = verdicts.filter(
     (v) => v.verdict === "REVIEW" && run.resolutions?.[v.address] !== "approve",
   ).length;
+  const evalErrors = verdicts.filter(
+    (v) => v.verdict === "EVALUATION_ERROR",
+  ).length;
   const expired = task && new Date(task.contract.expires_at) <= new Date();
   const blocked = expired
     ? "Contract expired"
-    : counts[2]
+    : evalErrors
+      ? `${evalErrors} technical evaluation ${evalErrors === 1 ? "error" : "errors"}: not approvable; repair evaluation and re-run`
+      : counts[2]
       ? `${counts[2]} explicit ${counts[2] === 1 ? "DENY" : "DENYs"} must be removed from the plan`
       : unresolved
         ? `${unresolved} REVIEW ${unresolved === 1 ? "requires" : "require"} a decision`
@@ -88,13 +84,14 @@ function App() {
     try {
       await fn();
     } catch (e) {
-      setError(e.message);
+      setError(describeError(e));
     } finally {
       setBusy("");
     }
   }
   useEffect(() => {
-    api("/tasks")
+    api
+      .listTasks()
       .then((ts) => {
         setTasks(ts);
         if (ts[0]) {
@@ -109,13 +106,14 @@ function App() {
           setEditor(JSON.stringify(ts[0].contract, null, 2));
         }
       })
-      .catch((e) => setError(e.message));
+      .catch((e) => setError(describeError(e)));
   }, []);
   useEffect(() => {
     if (screen === 4 && task)
-      api(`/tasks/${task.id}/audit`)
+      api
+        .getAudit(task.id)
         .then(setAudit)
-        .catch((e) => setError(e.message));
+        .catch((e) => setError(describeError(e)));
   }, [screen, task]);
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: "instant" });
@@ -126,7 +124,7 @@ function App() {
   };
   async function generate() {
     await work("Drafting contract", async () => {
-      let t = update(await api("/tasks", { task: text, mode }));
+      let t = update(await api.createTask(text, mode));
       setEditor(JSON.stringify(t.contract, null, 2));
       setScreen(1);
     });
@@ -134,13 +132,13 @@ function App() {
   async function evaluate(variant = "poisoned") {
     await work("Preparing Terraform edits", async () => {
       let id = task.id;
-      update(await api(`/tasks/${id}/agent?variant=${variant}`, {}));
+      update(await api.runAgent(id, variant));
       setBusy("Running Terraform plan");
-      update(await api(`/tasks/${id}/plan`, {}));
+      update(await api.plan(id));
       setBusy("Canonicalizing changes");
-      update(await api(`/tasks/${id}/canonicalize`, {}));
+      update(await api.canonicalize(id));
       setBusy("Evaluating Cedar policies");
-      update(await api(`/tasks/${id}/evaluate`, {}));
+      update(await api.evaluate(id));
       setScreen(2);
       setDecisions({});
     });
@@ -389,10 +387,7 @@ function App() {
                       onClick={() =>
                         work("Confirming", async () => {
                           update(
-                            await api(
-                              `/tasks/${task.id}/confirm`,
-                              JSON.parse(editor),
-                            ),
+                            await api.confirm(task.id, JSON.parse(editor)),
                           );
                           setEditor(
                             JSON.stringify(
@@ -517,6 +512,17 @@ function App() {
                 </div>
               ) : (
                 <div className="verdict-list">
+                  {evalErrors > 0 && (
+                    <div role="alert" className="notice">
+                      <OctagonX size={18} />
+                      <span>
+                        {evalErrors} resource
+                        {evalErrors === 1 ? "" : "s"} could not be evaluated
+                        (technical failure, not a REVIEW). These cannot be
+                        approved; repair evaluation and run a fresh plan.
+                      </span>
+                    </div>
+                  )}
                   {verdicts.map((v, i) => (
                     <article
                       key={run.id + v.address}
@@ -597,7 +603,7 @@ function App() {
                     disabled={!verdicts.length || !!busy}
                     onClick={() =>
                       work("Checking server gate", async () =>
-                        update(await api(`/tasks/${task.id}/apply`, {})),
+                        update(await api.apply(task.id)),
                       )
                     }
                   >
@@ -658,7 +664,7 @@ function App() {
                     onClick={() =>
                       work("Recording decisions", async () => {
                         update(
-                          await api(`/tasks/${task.id}/resolve`, decisions),
+                          await api.resolve(task.id, decisions),
                         );
                         setDecisions({});
                       })
