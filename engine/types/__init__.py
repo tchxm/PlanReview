@@ -54,7 +54,7 @@ class Contract(BaseModel):
 
 class Verdict(BaseModel):
     address: str
-    verdict: Literal["ALLOW", "REVIEW", "DENY"]
+    verdict: Literal["ALLOW", "REVIEW", "DENY", "EVALUATION_ERROR"]
     changes: list[Change]
     reason: str
     determining_policies: list[str] = Field(default_factory=list)

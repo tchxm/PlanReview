@@ -1,0 +1,22 @@
+(function(){
+'use strict';
+const PB=window.PB,oldEmit=PB.bus.emit.bind(PB.bus),listeners=new Map();
+/** Scoped subscriptions extend the original bus without dropping its boot listeners. */
+PB.bus.on=(name,fn)=>{if(!listeners.has(name))listeners.set(name,new Set());listeners.get(name).add(fn);const off=()=>listeners.get(name).delete(fn);if(PB.activeScope)PB.activeScope.push(off);return off};
+PB.bus.emit=(name,value)=>{oldEmit(name,value);listeners.get(name)?.forEach(fn=>fn(value))};
+PB.bus.count=()=>Array.from(listeners.values()).reduce((n,set)=>n+set.size,0);
+PB.frame=fn=>{PB.frames.push(fn);const off=()=>{const i=PB.frames.indexOf(fn);if(i>=0)PB.frames.splice(i,1)};if(PB.activeScope)PB.activeScope.push(off);return off};
+PB.listen=(el,event,fn,options)=>{el.addEventListener(event,fn,options);const off=()=>el.removeEventListener(event,fn,options);if(PB.activeScope)PB.activeScope.push(off);return off};
+PB.observe=(el,owner)=>{owner.visible=false;const obs=new IntersectionObserver(es=>{owner.visible=es[0].isIntersecting;PB.wake()});obs.observe(el);const off=()=>obs.disconnect();if(PB.activeScope)PB.activeScope.push(off);return off};
+PB.lifecycle={heroDisposals:0,heroInits:0,activeContext:null,awayTimer:0,heroScope:[],robotSlot:null,route:'/',
+ ensureHero(){if(PB.globe&&!PB.globe.disposed)return;this.heroInits++;PB.activeScope=this.heroScope=[];PB.initHero();if(PB.globe&&PB.quality>=1){const dpr=Math.max(.75,Math.min(devicePixelRatio,1.5)-.25);PB.globe.renderer.setPixelRatio(dpr);PB.globe.composer?.setPixelRatio(dpr)}PB.activeScope=null;if(PB.globe)PB.initTree();},
+ ensureRobot(){if(!PB.robot)PB.initRobot();},
+ disposeHero(){const g=PB.globe;if(!g||g.disposed)return;this.heroScope.splice(0).forEach(fn=>fn());const geometries=new Set(),materials=new Set(),textures=new Set();g.scene.traverse(o=>{if(o.geometry)geometries.add(o.geometry);if(o.material)(Array.isArray(o.material)?o.material:[o.material]).forEach(m=>materials.add(m))});materials.forEach(m=>{Object.values(m).forEach(v=>{if(v?.isTexture)textures.add(v)});m.dispose()});geometries.forEach(v=>v.dispose());textures.forEach(v=>v.dispose());g.composer?.passes.forEach(p=>{if(p.dispose)p.dispose()});g.composer?.renderTarget1.dispose();g.composer?.renderTarget2.dispose();g.renderer.dispose();g.renderer.forceContextLoss();g.canvas.replaceWith(g.canvas.cloneNode(false));g.disposed=true;g.visible=false;this.heroDisposals++;PB.tree=null;document.querySelectorAll('.node,.station-rail button,.leaders line').forEach(el=>el.remove());},
+ routeTo(path){this.route=path;clearTimeout(this.awayTimer);if(path==='/'){this.ensureHero();this.ensureRobot()}else{if(PB.globe)PB.globe.visible=false;if(PB.globe&&!PB.globe.disposed)this.awayTimer=setTimeout(()=>this.disposeHero(),60000);if(path==='/plan-review')this.ensureRobot()}PB.layoutDirty=true;},
+ /** Reparent the singleton canvas; the model, springs and cable arrays persist. */
+ robotTo(slot){this.robotSlot=slot;if(PB.robot&&slot){slot.append(PB.robot.renderer.domElement);PB.robot.slot=slot;PB.robot.resize?.()}if(PB.robot&&!slot)PB.robot.visible=false;},
+ stats(){return {frames:PB.frames.length,busListeners:PB.bus.count(),subscribers:PB.store?.subscriberCount(),heroInits:this.heroInits,heroDisposals:this.heroDisposals,activeContext:this.activeContext,hero:PB.globe&&!PB.globe.disposed?{...PB.globe.renderer.info.memory}:null,robot:PB.robot?{...PB.robot.renderer.info.memory}:null}}
+};
+// Arbitration runs before all v1 render callbacks, including at section boundaries.
+PB.frames.unshift(()=>{const life=PB.lifecycle,home=life.route==='/',g=PB.globe,r=PB.robot,hero=document.getElementById('hero'),slot=life.robotSlot;let gv=false,rv=false;if(home&&g&&!g.disposed){const box=hero.getBoundingClientRect();gv=box.top<innerHeight&&box.bottom>0}if(r&&slot&&slot.isConnected&&!(life.route==='/plan-review'&&innerWidth<=900)){const box=slot.getBoundingClientRect();r.bounds=box;rv=box.width>0&&box.top<innerHeight&&box.bottom>0}if(g)g.visible=gv&&!document.hidden;if(r)r.visible=rv&&!gv&&!document.hidden;life.activeContext=g?.visible?'hero':r?.visible?'robot':null;});
+})();

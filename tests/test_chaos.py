@@ -211,8 +211,8 @@ def test_chaos_07_reused_review_approval_cleared_on_new_plan(tmp_path):
     assert t["runs"][-1]["apply_result"]["spawned"] is False
 
 
-def test_chaos_08_cedar_failure_fails_closed_to_review():
-    """Scenario 8: If Cedar evaluation fails with an exception, verdict must fail closed to REVIEW, never ALLOW."""
+def test_chaos_08_cedar_failure_fails_closed_to_evaluation_error():
+    """Scenario 8: If Cedar evaluation fails with an exception, verdict must fail closed to EVALUATION_ERROR, never ALLOW."""
     c = Contract.model_validate({
         "contract_id": "test",
         "task": "test",
@@ -232,9 +232,10 @@ def test_chaos_08_cedar_failure_fails_closed_to_review():
     with patch("cedarpy.is_authorized", side_effect=RuntimeError("Simulated Cedar engine panic")):
         v = evaluate(c, ch, backend="cedar")
 
-    assert v.verdict == "REVIEW"
-    assert "Cedar evaluation unavailable" in v.reason
+    assert v.verdict == "EVALUATION_ERROR"
+    assert "Cedar evaluation failed" in v.reason
     assert v.verdict != "ALLOW"
+    assert v.verdict != "REVIEW"
 
 
 def test_chaos_09_repeated_apply_rejected(tmp_path):

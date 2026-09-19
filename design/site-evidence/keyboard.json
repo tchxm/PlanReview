@@ -1,0 +1,11 @@
+{
+  "keyboard_confirm": true,
+  "keyboard_review_approve": true,
+  "keyboard_mobile_apply": true,
+  "keyboard_evidence_detail": true,
+  "keyboard_faq": true,
+  "keyboard_legal_notice": true,
+  "keyboard_story_step": true,
+  "keyboard_home_focus": true,
+  "errors": []
+}
