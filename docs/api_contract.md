@@ -121,3 +121,23 @@ Anything else (RDS, IAM, security groups, networking, deletes, compound requests
 - No endpoint to read Cedar policy text or per-policy explanations beyond `determining_policies` ids and `reason`.
 - No resolver identity on `resolutions`; no evidence export endpoint (audit list only).
 - No endpoint listing supported operations (the capability registry is only visible through errors).
+
+## Observed examples
+
+Unsupported request (`POST /api/tasks`, HTTP 400):
+
+```json
+{"detail":{"error":"UNSUPPORTED_OPERATION","message":"The requested operation or service is outside genuinely supported capabilities. Matched unsupported pattern: \brds\b. Genuine supported operations: update_memory, update_tags.","details":{"task":"Delete the production RDS database and open port 22 to the world","pattern":"\brds\b"}}}
+```
+
+Live-model proposal rejected by the deterministic validator (`mode:"ollama"`, HTTP 400). The model returned a free-text resource name; the capability registry accepts only the canonical address:
+
+```json
+{"detail":{"error":"UNSUPPORTED_OPERATION","message":"Resource 'dev-api-Lambda' is not supported for operation 'update_memory'. Permitted resource: 'aws_lambda_function.dev_api'.","details":{"proposal":{"operation":"update_memory","resource_address":"dev-api-Lambda","attribute":"memory_size","requested_value":512}}}}
+```
+
+Empty task (HTTP 422): `{"detail":[{"type":"string_too_short","loc":["body","task"],"msg":"String should have at least 1 character"}]}`
+
+Apply blocked by the gate (HTTP 200; `run.apply_result`): `{"status":"BLOCKED","reason":"2 unresolved DENY; edit configuration and create a new plan","spawned":false}`
+
+Model unavailable and evaluation-error bodies follow the structured/`verdict:"EVALUATION_ERROR"` shapes above; they are exercised by mocked tests in `tests/test_phase1.py`, not captured from a live run.
