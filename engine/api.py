@@ -4,6 +4,7 @@ from fastapi.responses import JSONResponse
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 from pydantic import BaseModel, Field
 from engine.pipeline import Pipeline, LOCK, ROOT
+from engine.exceptions import PlanReviewError
 
 app = FastAPI(title="PlanReview", version="0.1.0")
 app.add_middleware(
@@ -41,6 +42,11 @@ def call(fn, *args):
     try:
         with LOCK:
             return fn(*args)
+    except PlanReviewError as exc:
+        raise HTTPException(
+            status_code=exc.status_code,
+            detail={"error": exc.code, "message": exc.message, "details": exc.details},
+        )
     except ValueError as exc:
         raise HTTPException(409, str(exc))
     except (OSError, TimeoutError) as exc:
@@ -65,6 +71,12 @@ def create(body: TaskInput):
 @app.get("/api/tasks/{id}")
 def get(id: str):
     return call(pipeline.store.get, id)
+
+
+@app.get("/api/tasks/{id}/intent")
+def intent(id: str):
+    t = call(pipeline.store.get, id)
+    return t.get("intent")
 
 
 @app.post("/api/tasks/{id}/confirm")
