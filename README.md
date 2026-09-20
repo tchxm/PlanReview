@@ -125,6 +125,9 @@ Install Ollama and pull `llama3.2:3b`, then select **Live Strands / Ollama** in 
 
 ## Structure
 
+Core of the submission: `engine/` (API and site engine), `design/planbound-site.html` (the site), `tests/`, `render.yaml`. Generated screenshot evidence and old delivery notes were removed; they are recoverable from git history.
+
+
 ```text
 engine/              Canonicalizer, contract, evaluators, gate, storage, API
 cedar/               Real policies, schema, policy tests

@@ -10,3 +10,11 @@ data/
 .env
 .provider-cache/
 .ruff_cache/
+
+# local design scratch (not part of the app)
+design/v3-evidence/
+design/planbound-site-part2.html
+design/SITE_V3_*.md
+design/planbound/gate*
+design/planbound/upgrade_site.py
+.claude/
