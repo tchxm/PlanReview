@@ -14,6 +14,7 @@ Nothing applies unless the gate opens, and every step lands in a **tamper-eviden
 ![Terraform](https://img.shields.io/badge/Terraform-7B42BC?logo=terraform&logoColor=white)
 ![Cedar](https://img.shields.io/badge/Policy-Cedar-1f6feb)
 ![Three.js](https://img.shields.io/badge/three.js-000000?logo=threedotjs&logoColor=white)
+![License: MIT](https://img.shields.io/badge/License-MIT-green)
 ![Cloud apply](https://img.shields.io/badge/real%20AWS%20apply-disabled-critical)
 
 <!-- Replace with a hero screenshot or GIF -->
@@ -131,6 +132,18 @@ cd web; npm ci; npm test                    # frontend API-client tests
 ## Security notes
 
 The signing secret comes from `PLANREVIEW_API_SECRET` (generated on Render) or a local, gitignored `data/api_secret`. The site API is same-origin only, rate limited and size limited. The seed state uses the dummy account `123456789012` and contains no secrets. Read the [threat model](docs/threat-model.md) before reusing any part of this.
+
+## Team
+
+| Name | Role | Links |
+|---|---|---|
+| **Afnan** | _Role, e.g. Backend and pipeline_ | [GitHub](https://github.com/tchxm) |
+| _Team member 2_ | _Role_ | _link_ |
+| _Team member 3_ | _Role_ | _link_ |
+
+## License
+
+Released under the [MIT License](LICENSE). Copyright (c) 2026 PlanBound Team.
 
 ---
 
