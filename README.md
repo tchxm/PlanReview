@@ -87,18 +87,26 @@ Nothing is ever deployed to a cloud account. See [audit integrity](docs/audit-in
 
 ## Architecture
 
-```text
-Browser ──► PlanReview site (design/planbound-site.html, three.js, vanilla JS)
-              │  same origin
-              ▼
-        FastAPI  engine/api.py
-          ├─ /api/site/*           site engine + evidence chain     engine/site.py
-          ├─ /api/site/pipeline/*  real pipeline bridge             engine/pipeline.py
-          ├─ Cedar evaluator       cedar/policies, schema, tests
-          ├─ Terraform             terraform/fixtures (dummy account, no secrets)
-          └─ SQLite                tasks, plans, HMAC audit chain
-        moto emulator (127.0.0.1)  target of permitted applies
+```mermaid
+flowchart LR
+    U([Reviewer]) --> S[PlanReview site]
+    S -->|same origin| API[FastAPI]
+    subgraph Trusted["Trusted control plane"]
+        API --> P[Pipeline + jobs]
+        P --> TF[Terraform plan]
+        TF --> CAN[Canonicalizer + mapper]
+        CAN --> CED[Cedar<br/>ALLOW / REVIEW / DENY]
+        CED --> G[Apply gate]
+        P --> DB[(SQLite + HMAC audit chain)]
+        G --> DB
+    end
+    P -. workspace only .-> AG[Untrusted agent]
+    G -->|permitted only| EM[(moto emulator<br/>127.0.0.1)]
 ```
+
+Principles: the agent is untrusted, Cedar decides (not prompts), unknowns fail toward REVIEW, approvals bind to one saved plan, and every event is HMAC-chained.
+
+**Built for AWS.** Cedar is the policy language behind Amazon Verified Permissions, the plans target the AWS Terraform provider (Lambda, S3, security groups), and every component has a mapped AWS service (Bedrock, Verified Permissions, CodeBuild, DynamoDB, KMS, CloudWatch). See [docs/architecture.md](docs/architecture.md) for the full diagrams, trust zones and the AWS mapping. The mapping is a proposed production path; this build runs on Render with an emulator.
 
 Deployed as a single Render web service ([render.yaml](render.yaml)). The build installs the Terraform CLI and pre-initialises a provider template so each task's `terraform init` is near-instant.
 
