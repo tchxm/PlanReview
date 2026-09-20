@@ -140,3 +140,7 @@ data/                Local SQLite and saved per-task plans (gitignored)
 ```
 
 Read [architecture](docs/architecture.md), [threat model](docs/threat-model.md), [development evidence](docs/development.md), and [demo script](docs/demo-script.md).
+
+### Real pipeline in the site (local)
+
+`python run_site.py` (or `.\start-demo.ps1`) starts the site, API, the real pipeline bridge (`/api/site/pipeline/*`: Terraform plan + Cedar + HMAC audit chain) and a loopback AWS emulator, so a permitted plan really applies to the emulator. In Plan Review, use **Run a task through the real pipeline**. It needs Terraform on PATH; a cold `terraform plan` can take minutes. The bridge is off on hosted deployments and only accepts loopback requests. Data and the provider cache are kept in `~/.planbound` when the repo is inside OneDrive.

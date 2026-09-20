@@ -6,7 +6,7 @@ It is a faithful port of the in-browser engine in design/planbound-site.html (sa
 same hashes), so server mode and offline mode produce identical verdicts. When both exist the server
 is authoritative: the client only displays what this module computes.
 
-What this is NOT: it never touches Terraform, cloud accounts, the Cedar/task pipeline or the task
+What this is NOT: the sandbox engine below never touches Terraform, cloud accounts, the Cedar/task pipeline or the task
 database. "Apply" only records a simulated apply event. It needs no bearer token because it holds no
 real data and no capability; it is same-origin only (see the Origin check in api.py), rate limited per
 address, body-size limited, and bounded (session count, records per session, plan size).
@@ -482,3 +482,116 @@ def verify(sid: str):
     store = get_store()
     _, st = store.mutate(sid, lambda st: None)
     return store.chain.verify(st)
+
+
+# ------------------------------------------------ real pipeline bridge (opt-in)
+# Lets the site drive the REAL task pipeline (Terraform plan + Cedar policies + the HMAC audit chain) with
+# no bearer token. Because that runs Terraform, it is OFF unless it is safe: local machine with Terraform
+# installed, requests from loopback only. PLANBOUND_PIPELINE=1 forces on, =0 forces off.
+import os
+import shutil
+
+from fastapi import Depends, Request
+
+pipe = APIRouter(prefix="/api/site/pipeline", tags=["pipeline"])
+ACTOR = "planbound-site"
+VARIANTS = {"intended": "Agent stays in scope", "poisoned": "Agent overreaches (network + public access)"}
+
+
+def pipeline_enabled():
+    flag = os.environ.get("PLANBOUND_PIPELINE")
+    if flag in ("0", "1"):
+        return flag == "1"
+    return shutil.which("terraform") is not None and not (os.environ.get("PLANREVIEW_PUBLIC_HOST") or os.environ.get("RENDER_EXTERNAL_HOSTNAME"))
+
+
+def guard(request: Request):
+    if not pipeline_enabled():
+        raise SiteError("The real pipeline is not enabled on this server (needs Terraform on a local machine).", "PIPELINE_DISABLED", 404)
+    host = request.client.host if request.client else ""
+    if host not in ("127.0.0.1", "::1", "testclient") and os.environ.get("PLANBOUND_PIPELINE") != "1":
+        raise SiteError("The real pipeline only accepts local requests.", "PIPELINE_LOCAL_ONLY", 403)
+
+
+def _api():
+    from engine import api
+
+    return api
+
+
+@pipe.get("/status")
+def pipe_status():
+    return {"enabled": pipeline_enabled(), "terraform": shutil.which("terraform") is not None, "variants": VARIANTS, "evaluator": "cedar", "agent": "offline fixture replay"}
+
+
+@pipe.post("/tasks", dependencies=[Depends(guard)])
+def pipe_create(body: dict = Body(...)):
+    api = _api()
+    task = _body(body).get("task")
+    if not isinstance(task, str) or not 1 <= len(task) <= 1000:
+        raise SiteError("Describe the task in 1–1000 characters.")
+    return api.task_view(api.call(api.pipeline.create, task, "replay", lock=False))
+
+
+@pipe.get("/tasks/{tid}", dependencies=[Depends(guard)])
+def pipe_get(tid: str):
+    api = _api()
+    return api.task_view(api.call(api.pipeline.store.get, tid, lock=False))
+
+
+@pipe.post("/tasks/{tid}/confirm", dependencies=[Depends(guard)])
+def pipe_confirm(tid: str):
+    api = _api()
+    t = api.call(api.pipeline.store.get, tid, lock=False)
+    return api.task_view(api.call(api.pipeline.confirm, tid, t["contract"]))
+
+
+@pipe.post("/tasks/{tid}/jobs", status_code=202, dependencies=[Depends(guard)])
+def pipe_job(tid: str, body: dict = Body(...)):
+    api = _api()
+    body = _body(body)
+    op, variant = body.get("op"), body.get("variant")
+    if op not in ("agent", "plan", "apply"):
+        raise SiteError("op must be agent, plan or apply.")
+    if op == "agent" and variant not in VARIANTS:
+        raise SiteError("Unknown agent variant.")
+    args = {"variant": variant} if op == "agent" else {}
+    return api.job_view(api.call(api._runner().submit, tid, op, args, ACTOR, lock=False))
+
+
+@pipe.get("/jobs/{jid}", dependencies=[Depends(guard)])
+def pipe_job_get(jid: str):
+    api = _api()
+    j = api.pipeline.store.job_get(jid)
+    if j is None:
+        raise SiteError("Job not found", "JOB_NOT_FOUND", 404)
+    return api.job_view(j)
+
+
+@pipe.post("/tasks/{tid}/step/{step}", dependencies=[Depends(guard)])
+def pipe_step(tid: str, step: str):
+    api = _api()
+    if step not in ("canonicalize", "evaluate"):
+        raise SiteError("Unknown step.")
+    return api.task_view(api.call(getattr(api.pipeline, step), tid))
+
+
+@pipe.post("/tasks/{tid}/resolve", dependencies=[Depends(guard)])
+def pipe_resolve(tid: str, body: dict = Body(...)):
+    api = _api()
+    res = _body(body).get("resolutions")
+    if not isinstance(res, dict) or not all(isinstance(k, str) and v in ("approve", "reject") for k, v in res.items()):
+        raise SiteError("resolutions must map an address to approve or reject.")
+    return api.task_view(api.call(api.pipeline.resolve, tid, res, ACTOR))
+
+
+@pipe.get("/tasks/{tid}/audit", dependencies=[Depends(guard)])
+def pipe_audit(tid: str):
+    api = _api()
+    api.call(api.pipeline.store.get, tid, lock=False)
+    return api.audit_view(api.pipeline.store.audit(tid, 200, 0))
+
+
+@pipe.get("/audit/verify", dependencies=[Depends(guard)])
+def pipe_verify():
+    return _api().pipeline.store.verify_audit()

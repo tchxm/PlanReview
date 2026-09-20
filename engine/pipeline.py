@@ -192,7 +192,7 @@ class Pipeline:
         import os
 
         env = os.environ.copy()
-        env["TF_PLUGIN_CACHE_DIR"] = str(ROOT / ".provider-cache")
+        env["TF_PLUGIN_CACHE_DIR"] = os.environ.get("PLANREVIEW_PLUGIN_CACHE") or str(ROOT / ".provider-cache")
         report(f"terraform {args[0]}")
         try:
             p = run_tree(

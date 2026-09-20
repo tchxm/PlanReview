@@ -426,6 +426,7 @@ from fastapi.responses import FileResponse  # noqa: E402
 from engine import site as site_api  # noqa: E402
 
 app.include_router(site_api.router)
+app.include_router(site_api.pipe)
 SITE_HTML = _Path(__file__).resolve().parents[1] / "design" / "planbound-site.html"
 
 

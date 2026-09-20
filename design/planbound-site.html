@@ -252,6 +252,16 @@ button.badge,button.site-button:not(.sound){font-size:11px!important}
 .site-button{font-size:12px}
 @media(max-width:900px){.badge,.site-button,.chip,summary,.how-list li,.json-key,.json-number,.json-string{font-size:11px}}
 </style>
+<style id="phase4-css">
+.pipe-panel{margin:0 0 28px;border-color:var(--accent)}.pipe-panel h2{font:400 clamp(26px,3vw,38px)/1.1 var(--serif);margin:8px 0 10px}
+.pipe-panel textarea{width:100%;min-height:96px;margin:8px 0 12px;padding:12px;font:14px/1.5 var(--sans)}
+.pipe-steps{list-style:none;margin:16px 0;padding:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:6px 14px;font:12px/1.6 var(--mono);color:var(--muted)}
+.pipe-step.done{color:var(--ink)}.pipe-step.now{color:var(--accent)}.pipe-step.bad{color:var(--ink);text-decoration:underline}.pipe-glyph{display:inline-block;width:16px}
+.pipe-contract{border:1px solid var(--line);padding:12px 14px;margin:8px 0 14px;font-size:14px}.pipe-contract p{margin:6px 0}
+.pipe-note{font:12px/1.6 var(--mono);color:var(--ink);border-left:3px solid var(--accent);padding:6px 12px;margin:12px 0}
+.pipe-verdict{border:1px solid var(--line);padding:14px 16px;margin:10px 0}.pipe-verdict.v-deny{border-left:3px solid #ff6f72}.pipe-verdict.v-review{border-left:3px solid #f1c34f}.pipe-verdict.v-allow{border-left:3px solid #72e6a1}
+.pipe-vhead{display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px}.pipe-apply{margin:16px 0}
+</style>
 </head><body>
 <div id="boot" class="boot robot-gate" role="dialog" aria-modal="true" aria-label="Start PlanBound">
 <span class="gate-chrome gate-tl">PLANBOUND / BOUNDARY REVIEWER PB-01</span><span class="gate-chrome gate-tr">STATUS: <span id="robot-status">BOOT</span></span>
@@ -860,7 +870,7 @@ register('/contract','Contract',(el,ctx)=>{
 
 register('/plan-review','Plan Review',(el,ctx)=>{
  el.className='subview';const hd=U.heading('Every change. A decision.','02 / INSPECT','Inspect the matched rule, resolve uncovered changes, and test the simulated apply gate.');hd.append(PB.sourceTag(ctx));el.append(hd);
- const banner=h('div',{}),grid=h('div',{class:'review-console'}),left=h('aside',{class:'review-left'}),center=h('section',{class:'review-center','aria-label':'Plan changes'}),right=h('aside',{class:'review-right'}),contract=h('div',{class:'site-panel contract-panel'}),picker=h('details',{class:'site-panel picker-panel',open:matchMedia('(min-width:901px)').matches},h('summary',{},'Plan picker · sample data')),companion=h('div',{class:'companion','data-robot-slot':'','data-companion':'true','data-cursor':'LOOK','aria-label':'Boundary reviewer'}),gate=h('div',{class:'site-panel gate-card'});el.append(banner,grid);grid.append(left,center,right);left.append(contract,picker);right.append(companion,gate);
+ const banner=h('div',{}),grid=h('div',{class:'review-console'}),left=h('aside',{class:'review-left'}),center=h('section',{class:'review-center','aria-label':'Plan changes'}),right=h('aside',{class:'review-right'}),contract=h('div',{class:'site-panel contract-panel'}),picker=h('details',{class:'site-panel picker-panel',open:matchMedia('(min-width:901px)').matches},h('summary',{},'Plan picker · sample data')),companion=h('div',{class:'companion','data-robot-slot':'','data-companion':'true','data-cursor':'LOOK','aria-label':'Boundary reviewer'}),gate=h('div',{class:'site-panel gate-card'});el.append(banner,PB.pipePanel(ctx),grid);grid.append(left,center,right);left.append(contract,picker);right.append(companion,gate);
  async function loadPlan(id,input){center.classList.add('is-loading');center.setAttribute('aria-busy','true');try{await PB.api.load(id,input);PB.toast(input?'Pasted plan evaluated.':'Loaded '+id+'.')}finally{center.classList.remove('is-loading');center.removeAttribute('aria-busy')}}
  const select=h('select',{id:'sample-plan',onChange:e=>{const id=e.target.value;loadPlan(id).catch(err=>{PB.api.fail(err,()=>loadPlan(id));select.value=PB.store.get().planId})}});for(const [id,label]of [['sample-a','Sample A · mixed verdicts'],['sample-b','Sample B · clean plan'],['sample-c','Sample C · prod scenario']])select.append(h('option',{value:id},label));select.value=PB.store.get().planId;
  const paste=h('textarea',{id:'paste-plan','aria-label':'Paste plan JSON',spellcheck:false,placeholder:'Paste an array of normalized changes'}),pasteError=h('div',{role:'status'});picker.append(C('SAMPLE DATA / PLAN PICKER'),h('label',{for:'sample-plan'},'Choose a sample plan'),select,h('p',{class:'rule-reason'},'Sample C needs a confirmed prod boundary that includes database instances.'),L('Define a boundary →','/contract'),h('label',{for:'paste-plan'},'Paste plan JSON'),paste,B('Load pasted plan',async function run(){try{if(paste.value.length>200000)throw Error('Keep pasted plans below 200 KB.');const parsed=JSON.parse(paste.value);await loadPlan('pasted',parsed);pasteError.replaceChildren();select.selectedIndex=-1}catch(e){if(e.network)PB.api.fail(e,run);pasteError.replaceChildren(U.error({what:e instanceof SyntaxError?'That is not valid JSON. It must be an array of changes.':e.message,kept:'Nothing was loaded and your text is still in the box.',next:'Fix it and try again.',retry:run}))}},{'data-load-plan':''}),pasteError);
@@ -978,11 +988,11 @@ document.addEventListener('pointerover',e=>{root.classList.toggle('cursor-zone',
 <script id="phase3">
 (function(){'use strict';
 const PB=window.PB,E=PB.engine,U=PB.ui,h=PB.h,B=U.button,L=U.link,BASE='/api/site',SIDKEY='planbound.site.sid',HTTP=/^https?:$/.test(location.protocol);
-let mode='offline',sid=null,draftTimer=0,wasServer=false,dirty=false,lastVerify=null;const subs=new Set();
+let pipeInfo=null,mode='offline',sid=null,draftTimer=0,wasServer=false,dirty=false,lastVerify=null;const subs=new Set();
 const say=t=>PB.a11y&&PB.a11y.announce(t),pick=c=>({environment:c.environment,allowed:[...c.allowed],maxBlast:c.maxBlast,note:c.note});
 function setMode(m,why){if(m===mode)return;mode=m;if(m==='server')wasServer=true;subs.forEach(f=>f(m));say(m==='server'?'Connected to the PlanBound server. Verdicts are now computed on the server.':'Working offline in this browser. Verdicts are now computed in this page.');PB.bus.emit('api',{mode:m,why})}
 async function fetchT(url,ms,opt={}){const c=new AbortController(),t=setTimeout(()=>c.abort(),ms);try{return await fetch(url,{...opt,signal:c.signal,cache:'no-store'})}finally{clearTimeout(t)}}
-async function req(method,path,body){let r;try{r=await fetchT(BASE+path,8000,{method,headers:body===undefined?{}:{'Content-Type':'application/json'},body:body===undefined?undefined:JSON.stringify(body)})}catch(e){const err=new Error('The server could not be reached.');err.network=true;throw err}let data=null;try{data=await r.json()}catch(e){}if(!r.ok){const d=(data&&data.detail)||{},err=new Error(d.message||'The server returned an error ('+r.status+').');err.status=r.status;err.code=d.error;throw err}return data}
+async function req(method,path,body,ms=8000){let r;try{r=await fetchT(BASE+path,ms,{method,headers:body===undefined?{}:{'Content-Type':'application/json'},body:body===undefined?undefined:JSON.stringify(body)})}catch(e){const err=new Error('The server could not be reached.');err.network=true;throw err}let data=null;try{data=await r.json()}catch(e){}if(!r.ok){const d=(data&&data.detail)||{},err=new Error(d.message||'The server returned an error ('+r.status+').');err.status=r.status;err.code=d.error;throw err}return data}
 async function connect(){if(!HTTP)return null;try{const r=await fetchT('/api/health',1500);if(!r.ok||(await r.json()).status!=='ok')return null}catch(e){return null}
  try{let st=null;sid=null;try{sid=sessionStorage.getItem(SIDKEY)}catch(e){}if(sid){try{st=await req('GET','/sessions/'+sid)}catch(e){if(e.network)return null}}if(!st)st=await req('POST','/sessions');sid=st.sessionId;try{sessionStorage.setItem(SIDKEY,sid)}catch(e){}return st}catch(e){return null}}
 const take=(st,extra)=>PB.store.hydrate(st,extra);let apiQ=Promise.resolve();const S=fn=>{const p=apiQ.then(fn);apiQ=p.catch(()=>{});return p};
@@ -997,9 +1007,11 @@ async function browserVerify(){const recs=PB.store.get().records;let bad=null,la
  let hex=null;if(recs.length){const text=JSON.stringify(recs[recs.length-1]);hex=globalThis.crypto&&crypto.subtle?Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(text))),v=>v.toString(16).padStart(2,'0')).join(''):E.fnv(text)}
  return {ok:!bad,records:recs.length,first_broken:bad,latest_hash:hex,algorithm:'consistency check (verdict and contract hash recomputed per record; no chain)',verified_by:'browser',scope:'browser session'}}
 const api={
+ get pipeEnabled(){return mode==='server'&&!!(pipeInfo&&pipeInfo.enabled)},get pipeVariants(){return pipeInfo?pipeInfo.variants:{}},
+ pipe:{create:t=>req('POST','/pipeline/tasks',{task:t},60000),get:id=>req('GET','/pipeline/tasks/'+id,undefined,60000),confirm:id=>req('POST','/pipeline/tasks/'+id+'/confirm',undefined,60000),job:(id,op,variant)=>req('POST','/pipeline/tasks/'+id+'/jobs',{op,variant}),getJob:j=>req('GET','/pipeline/jobs/'+j),step:(id,s)=>req('POST','/pipeline/tasks/'+id+'/step/'+s,undefined,240000),resolve:(id,r)=>req('POST','/pipeline/tasks/'+id+'/resolve',{resolutions:r},60000),audit:id=>req('GET','/pipeline/tasks/'+id+'/audit',undefined,60000),verify:()=>req('GET','/pipeline/audit/verify',undefined,60000)},
  get mode(){return mode},get sessionId(){return sid},subscribe(f){subs.add(f);return()=>subs.delete(f)},
- async init(){await E.init();const st=await connect();if(st){take(st,{wizardStep:st.contract.confirmed?3:1});setMode('server')}else setMode('offline','init')},
- async reconnect(){const st=await connect();if(!st){setMode('offline','down');return false}await replay(st);setMode('server');return true},
+ async init(){await E.init();const st=await connect();if(st){take(st,{wizardStep:st.contract.confirmed?3:1});try{pipeInfo=await req('GET','/pipeline/status')}catch(e){pipeInfo=null}setMode('server')}else setMode('offline','init')},
+ async reconnect(){const st=await connect();if(!st){setMode('offline','down');return false}await replay(st);try{pipeInfo=await req('GET','/pipeline/status')}catch(e){pipeInfo=null}setMode('server');return true},
  useOffline(){setMode('offline','chosen')},
  draft(patch){E.draft(patch);dirtyMark();queueDraft()},reset(){E.reset();dirtyMark();queueDraft()},
  async confirm(){if(mode!=='server'){dirtyMark();return E.confirm()}const s=PB.store.get();E.validateContract(s.contract);if(!s.consent)throw Error('Confirm the consent checkbox before submitting.');return S(async()=>{await flush();take(await req('POST','/sessions/'+sid+'/confirm',{contract:pick(s.contract),consent:true}),{wizardStep:3})})},
@@ -1079,6 +1091,45 @@ function onKey(e){if(e.key==='Escape'&&active&&!document.querySelector('dialog[o
 function start(){if(active||PB.phase!=='site')return;active=true;step=-1;addEventListener('scroll',queue,{passive:true});addEventListener('resize',queue);document.addEventListener('keydown',onKey);unsub=PB.store.subscribe(queue);go(0).then(()=>nextB.focus({preventScroll:true}))}
 function stop(done){if(!active)return;active=false;card.hidden=true;mark(null);timers.forEach(clearInterval);timers=[];cancelAnimationFrame(raf);raf=0;removeEventListener('scroll',queue);removeEventListener('resize',queue);document.removeEventListener('keydown',onKey);unsub&&unsub();unsub=null;step=-1;PB.a11y.announce(done?'Guided demo finished.':'Guided demo ended.')}
 PB.tour={start,stop,get active(){return active},get step(){return step}};PB.tourSync&&PB.tourSync();
+})();
+</script>
+<script id="phase4">
+(function(){'use strict';
+const PB=window.PB,U=PB.ui,h=PB.h,B=U.button,C=U.caption,P=()=>PB.api.pipe;
+const TASK='Increase memory for dev-api Lambda; send unanticipated networking changes to human review. Production and public access are forbidden.';
+const STAGES=['Draft contract','Confirm boundary','Agent edits Terraform','terraform plan','Canonicalize plan','Cedar evaluation','Human resolution','Apply gate'];
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+PB.pipePanel=ctx=>{
+ const root=h('section',{class:'site-panel pipe-panel','aria-label':'Real pipeline'});let alive=true,busy=false,st={task:null,stage:-1,failed:null,note:'',variant:'intended',audit:null,verify:null,text:TASK};ctx.clean.push(()=>{alive=false});
+ const paint=()=>{if(!alive)return;const a=PB.api;root.hidden=false;
+  if(a.mode!=='server'||!a.pipeEnabled){root.replaceChildren(C('REAL PIPELINE · TERRAFORM + CEDAR'),h('p',{class:'rule-reason'},a.mode!=='server'?'The real pipeline (Terraform plan, Cedar policies, HMAC audit chain) runs when the PlanBound server is connected.':'The real pipeline (Terraform plan, Cedar policies, HMAC audit chain) is available when the server runs locally with Terraform installed: .\\start.ps1'));return}
+  const t=st.task,run=t&&t.runs&&t.runs[t.runs.length-1],verdicts=run&&run.verdicts;
+  const tracker=h('ol',{class:'pipe-steps','aria-label':'Pipeline stages'},STAGES.map((s,i)=>h('li',{class:'pipe-step '+(st.failed===i?'bad':i<st.stage?'done':i===st.stage?'now':'')},h('span',{class:'pipe-glyph','aria-hidden':'true'},st.failed===i?'×':i<st.stage?'✓':i===st.stage?'●':'○'),s)));
+  const kids=[C('REAL PIPELINE · TERRAFORM + CEDAR · NOTHING IS DEPLOYED'),h('h2',{},'Run a task through the real pipeline'),h('p',{class:'rule-reason'},'A task becomes a contract, an agent edits Terraform, Terraform plans it, and Cedar policies decide each change. Every step is written to the server’s HMAC-chained audit log.')];
+  if(!t){kids.push(h('label',{for:'pipe-task'},'Task'),h('textarea',{id:'pipe-task',maxlength:1000,value:st.text,onInput:e=>{st.text=e.target.value}}),U.toggleGroup('Agent behaviour',Object.keys(a.pipeVariants),st.variant,v=>{st.variant=v;paint()}),h('p',{class:'rule-reason'},a.pipeVariants[st.variant]+'. The agent here is an offline fixture replay, not a live model.'),B('Draft contract →',draft,{class:'site-button primary','data-pipe-draft':''}))}
+  else{const c=t.contract;kids.push(tracker,h('div',{class:'pipe-contract'},C('CONTRACT · '+(c.status||'').toUpperCase()),h('p',{},'May change: '+c.allowed_resource_addresses.join(', ')+' · operations: '+c.allowed_operations.join(', ')+' · max resources: '+c.max_changed_resources+' · region: '+c.allowed_regions.join(', ')),h('p',{class:'rule-reason'},'Forbidden: '+(c.denies||[]).join(', ')||'none')));
+   if(t.stage==='draft')kids.push(B('Confirm boundary and run →',run_,{class:'site-button primary','data-pipe-run':''}),h('p',{class:'rule-reason'},'Confirming is the human step: the pipeline records you as the approver of this scope.'));
+   if(st.note)kids.push(h('p',{class:'pipe-note',role:'status'},st.note));
+   if(verdicts){kids.push(C('CEDAR VERDICTS · '+verdicts.length+' CHANGES'),...verdicts.map(v=>{const res=(run.resolutions||{})[v.address];return h('article',{class:'pipe-verdict v-'+v.verdict.toLowerCase(),'data-address':v.address},h('div',{class:'pipe-vhead'},U.badge(v.verdict),h('strong',{},v.address)),h('p',{class:'rule-reason'},v.reason),h('ul',{class:'diff-summary'},(v.changes||[]).map(ch=>h('li',{},h('b',{},ch.attribute+': '),h('span',{class:'from'},JSON.stringify(ch.before)),' → ',h('span',{class:'to'},JSON.stringify(ch.after))))),h('p',{class:'tl-detail'},'policy: '+(v.determining_policies||[]).join(', ')),v.verdict==='REVIEW'?h('div',{class:'row-actions'},B(res==='approve'?'Approved':'Approve',()=>resolve(v.address,'approve'),{'aria-pressed':String(res==='approve'),'data-pipe-approve':''}),B(res==='reject'?'Rejected':'Reject',()=>resolve(v.address,'reject'),{'aria-pressed':String(res==='reject')})):v.verdict==='DENY'?h('span',{class:'locked'},'Locked by boundary'):null)}));
+    const ar=run.apply_result;kids.push(h('div',{class:'pipe-apply'},B(ar?'Apply attempted':'Try apply',apply,{class:'site-button primary',disabled:!!ar||busy,'data-pipe-apply':''}),ar?h('p',{class:'pipe-note',role:'status'},h('b',{},ar.status),' — ',ar.reason||'',' ',h('span',{class:'sample-tag'},'The backend evaluated the gate; nothing is deployed to the cloud.')):h('p',{class:'rule-reason'},'The server decides whether the gate opens. A DENY blocks it.')));
+    kids.push(h('div',{class:'site-actions'},B('Show audit trail',audit,{'data-pipe-audit':''}),B('Verify audit chain',verify,{'data-pipe-verify':''}),B('Start over',()=>{st={...st,task:null,stage:-1,failed:null,note:'',audit:null,verify:null};paint()})));}
+   if(st.verify)kids.push(h('div',{class:'verify-result '+(st.verify.ok?'ok':'bad'),role:'status'},h('p',{class:'verify-title'},(st.verify.ok?'✓ CHAIN VERIFIED · SERVER — ':'! CHAIN PROBLEM — ')+st.verify.checked+' events checked · HMAC-SHA256 chain recomputed'+(st.verify.problems&&st.verify.problems.length?' · '+st.verify.problems.length+' problem(s)':''))));
+   if(st.audit)kids.push(h('ol',{class:'tl','aria-label':'Pipeline audit trail'},st.audit.map(e=>h('li',{class:'tl-item'},h('span',{class:'tl-dot','aria-hidden':'true'}),h('div',{class:'tl-body'},h('div',{class:'tl-head'},h('strong',{},e.kind),h('time',{},PB.rel(e.timestamp))))))));}
+  root.replaceChildren(...kids)};
+ const fail=(e,retry)=>{busy=false;if(e.network)PB.api.fail(e,retry);else st.note='That did not work: '+e.message+' Nothing was lost; your task and results are still here.';paint()};
+ async function draft(){if(busy)return;busy=true;try{st.task=await P().create(st.text);st.stage=1;st.note='';busy=false;paint()}catch(e){fail(e,draft)}}
+ async function job(op,variant,label){st.note=label;paint();let j=await P().job(st.task.id,op,variant);while(alive&&!['succeeded','failed','cancelled','interrupted'].includes(j.status)){if(j.progress)st.note=label+' — '+j.progress;paint();await sleep(700);j=await P().getJob(j.id)}if(j.status!=='succeeded')throw Error((j.error&&j.error.message)||('Job '+j.status))}
+ async function run_(){if(busy)return;busy=true;const at=st.stage;try{if(st.stage<=1){st.task=await P().confirm(st.task.id);st.stage=2}
+   if(st.stage===2){await job('agent',st.variant,'The agent is editing Terraform…');st.stage=3}
+   if(st.stage===3){await job('plan',null,'Running terraform plan (the first run can take up to a minute)…');st.stage=4}
+   if(st.stage===4){await P().step(st.task.id,'canonicalize');st.stage=5}
+   if(st.stage===5){st.task=await P().step(st.task.id,'evaluate');st.stage=7}
+   st.task=await P().get(st.task.id);st.note='';busy=false;paint();PB.a11y.announce('Cedar evaluation finished. '+st.task.runs[st.task.runs.length-1].verdicts.length+' changes have verdicts.')}catch(e){st.failed=st.stage;busy=false;if(!e.network)st.stage=at;fail(e,()=>{st.failed=null;run_()})}}
+ async function resolve(addr,choice){try{st.task=await P().resolve(st.task.id,{[addr]:choice});st.stage=7;paint();PB.a11y.announce((choice==='approve'?'Approved ':'Rejected ')+addr)}catch(e){fail(e,()=>resolve(addr,choice))}}
+ async function apply(){if(busy)return;busy=true;try{await job('apply',null,'Asking the server to apply…');st.task=await P().get(st.task.id);st.note='';busy=false;paint()}catch(e){busy=false;try{st.task=await P().get(st.task.id)}catch(x){}fail(e,apply)}}
+ async function audit(){try{st.audit=await P().audit(st.task.id);paint()}catch(e){fail(e,audit)}}
+ async function verify(){try{st.verify=await P().verify();paint();PB.a11y.announce(st.verify.ok?'Audit chain verified.':'Audit chain problem found.')}catch(e){fail(e,verify)}}
+ ctx.clean.push(PB.api.subscribe(paint));paint();return root};
 })();
 </script>
 </body></html>

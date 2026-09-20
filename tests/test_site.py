@@ -145,3 +145,15 @@ def test_site_is_served_from_the_same_origin(client):
 def test_cross_origin_mutation_is_blocked(client):
     r = client.post("/api/site/sessions", headers={"Origin": "http://evil.example"})
     assert r.status_code == 403
+
+
+def test_pipeline_bridge_status_and_guard(client, monkeypatch):
+    monkeypatch.setenv("PLANBOUND_PIPELINE", "0")
+    assert client.get("/api/site/pipeline/status").json()["enabled"] is False
+    assert client.post("/api/site/pipeline/tasks", json={"task": "x"}).status_code == 404  # off => not reachable
+    monkeypatch.setenv("PLANBOUND_PIPELINE", "1")
+    t = client.post("/api/site/pipeline/tasks", json={"task": "Increase memory for dev-api Lambda"}).json()
+    assert t["stage"] == "draft" and t["contract"]["allowed_resource_types"] == ["aws_lambda_function"]
+    assert client.post(f"/api/site/pipeline/tasks/{t['id']}/jobs", json={"op": "rm"}).status_code == 400
+    assert client.post(f"/api/site/pipeline/tasks/{t['id']}/resolve", json={"resolutions": {"a": "maybe"}}).status_code == 400
+    assert client.get("/api/site/pipeline/audit/verify").json()["ok"] is True
