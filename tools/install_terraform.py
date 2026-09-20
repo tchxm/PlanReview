@@ -30,16 +30,15 @@ def main():
         exe.chmod(exe.stat().st_mode | stat.S_IEXEC)
     env = {**os.environ, "PATH": str(bindir) + os.pathsep + os.environ["PATH"], "TF_PLUGIN_CACHE_DIR": str(ROOT / ".provider-cache")}
     (ROOT / ".provider-cache").mkdir(exist_ok=True)
-    work = ROOT / "data" / "_warm"
+    work = ROOT / ".tf-template"  # kept: new tasks reuse its initialized providers (engine/pipeline.py)
     shutil.rmtree(work, ignore_errors=True)
     work.mkdir(parents=True)
-    for n in ["main.tf", ".terraform.lock.hcl", "lambda.zip"]:
+    for n in ["main.tf", "lambda.zip"]:  # no repo lock file: let init write one that includes THIS platform's hashes
         s = ROOT / "terraform/fixtures/baseline" / n
         if s.exists():
             shutil.copy2(s, work / n)
     print("Warming the AWS provider cache (one-time download)...")
     r = subprocess.run([str(exe), "init", "-input=false", "-no-color"], cwd=work, env=env)
-    shutil.rmtree(work, ignore_errors=True)
     sys.exit(r.returncode)
 
 

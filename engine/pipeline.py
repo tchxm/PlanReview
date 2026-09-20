@@ -112,6 +112,22 @@ class Pipeline:
         self.store.save(t, "human_confirmation")
         return t
 
+    @staticmethod
+    def _reuse_initialized_providers(workspace):
+        """Hosted builds keep an initialized template (tools/install_terraform.py). Linking its providers and using
+        its platform-correct lock file makes `terraform init` instant instead of re-downloading the AWS provider
+        per task. Any problem (no template, no symlink permission) falls back to a normal init."""
+        import os
+
+        template = ROOT / ".tf-template"
+        try:
+            if (template / ".terraform" / "providers").is_dir() and (template / ".terraform.lock.hcl").exists():
+                shutil.copy2(template / ".terraform.lock.hcl", workspace / ".terraform.lock.hcl")
+                (workspace / ".terraform").mkdir(exist_ok=True)
+                os.symlink(template / ".terraform" / "providers", workspace / ".terraform" / "providers", target_is_directory=True)
+        except (OSError, NotImplementedError):
+            shutil.rmtree(workspace / ".terraform", ignore_errors=True)
+
     def agent(self, id, variant="poisoned"):
         t = self.store.get(id)
         assert_contract_integrity(t)
@@ -129,6 +145,7 @@ class Pipeline:
             workspace.mkdir(parents=True)
             for name in ["terraform.tfstate", "lambda.zip", ".terraform.lock.hcl"]:
                 shutil.copy2(source / name, workspace / name)
+            self._reuse_initialized_providers(workspace)
 
         log = "Offline fixture replay; no LLM was invoked"
         t["agent_variant"] = variant
