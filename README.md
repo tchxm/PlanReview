@@ -28,7 +28,7 @@ Nothing applies unless the gate opens, and every step lands in a **tamper-eviden
 
 AI agents can now write infrastructure code. A wrong edit can open a bucket to the internet or touch production. Reviewing a wall of `terraform plan` output by hand does not scale, and "the model promised to behave" is not a control.
 
-## What PlanBound does
+## What PlanReview does
 
 | Step | What happens | Who decides |
 |---|---|---|
