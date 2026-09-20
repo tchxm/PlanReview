@@ -1,8 +1,39 @@
 """Single process-spawn boundary; callers supply server-owned run artifacts."""
 
 import hashlib
+import os
 import subprocess
+from urllib.parse import urlparse
+
+from engine.proc import report, run_tree
 from pathlib import Path
+
+
+LOOPBACK = {"127.0.0.1", "localhost", "::1"}
+REAL_CREDENTIAL_VARS = ("AWS_PROFILE", "AWS_SESSION_TOKEN", "AWS_SHARED_CREDENTIALS_FILE", "AWS_CONFIG_FILE", "AWS_WEB_IDENTITY_TOKEN_FILE", "AWS_ROLE_ARN")
+
+
+def emulator_endpoint():
+    """None: not in emulator mode. False: misconfigured (never loopback). Otherwise the loopback endpoint URL.
+
+    Emulator mode is the ONLY way a plan touching AWS resource types can be applied, and it can only talk to a
+    local emulator: the endpoint must be loopback, dummy credentials are forced and real credential variables
+    are removed from the child process environment (see `emulator_env`)."""
+    ep = os.environ.get("PLANREVIEW_EMULATOR_ENDPOINT")
+    if not ep:
+        return None
+    try:
+        return ep if urlparse(ep).hostname in LOOPBACK else False
+    except ValueError:
+        return False
+
+
+def emulator_env(endpoint):
+    env = os.environ.copy()
+    for name in REAL_CREDENTIAL_VARS:
+        env.pop(name, None)
+    env.update({"AWS_ENDPOINT_URL": endpoint, "AWS_ACCESS_KEY_ID": "test", "AWS_SECRET_ACCESS_KEY": "test", "AWS_S3_USE_PATH_STYLE": "true"})
+    return env
 
 
 def digest(path):
@@ -93,21 +124,29 @@ def apply_saved(contract, run, resolutions):
             "reason": "Missing or invalid canonical plan data",
             "spawned": False,
         }
-    # This build intentionally has no route to a real cloud apply.
+    # No route to a real cloud apply: AWS resource types apply only against a loopback emulator.
+    child_env, emulated = None, False
     if any(c.get("resource_type") != "terraform_data" for c in canonical):
-        return {
-            "status": "BLOCKED",
-            "reason": "AWS apply disabled: configure and verify an isolated emulator first",
-            "spawned": False,
-        }
+        ep = emulator_endpoint()
+        if ep is None:
+            return {
+                "status": "BLOCKED",
+                "reason": "AWS apply disabled: configure and verify an isolated emulator first",
+                "spawned": False,
+            }
+        if ep is False:
+            return {"status": "BLOCKED", "reason": "PLANREVIEW_EMULATOR_ENDPOINT must point at a loopback address; refusing to apply", "spawned": False}
+        child_env, emulated = emulator_env(ep), True
     command = ["terraform", "apply", "-input=false", "-no-color", str(path.resolve())]
     try:
-        p = subprocess.run(
-            command, cwd=run["workspace"], capture_output=True, text=True, timeout=180
+        report("terraform apply")
+        p = run_tree(
+            command, cwd=run["workspace"], env=child_env, capture_output=True, text=True, timeout=180
         )
         return {
             "status": "APPLIED" if p.returncode == 0 else "FAILED",
             "spawned": True,
+            "emulated": emulated,
             "command": command,
             "exit_code": p.returncode,
             "stdout": p.stdout,

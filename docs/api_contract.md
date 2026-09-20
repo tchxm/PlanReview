@@ -11,7 +11,7 @@
 >
 > **New routes.** `GET /api/auth/whoami` (read), `GET /api/tasks/{id}/evidence/{event_id}` (evidence), `GET /api/audit/verify` (evidence; see `docs/audit-integrity.md`). New optional field `intent.mapped_from` when a model's informal resource name was mapped by the deterministic allowlist.
 >
-> **Coordination.** Mutations are serialized per task; reads never wait for a mutation; different tasks run in parallel. Run a **single Uvicorn worker**: locks are in-process.
+> **Coordination.** Mutations are serialized per task; reads never wait for a mutation; different tasks run in parallel. Multiple workers/processes are safe: task saves are version-checked (409 `CONCURRENT_MODIFICATION` if stale, reload and retry). Long operations should use `POST /api/tasks/{id}/jobs` (202, poll `GET /api/jobs/{id}`, `POST /api/jobs/{id}/cancel`); while a job is active, synchronous mutations of that task return 409 `JOB_IN_PROGRESS`.
 >
 > **Configuration.** `PLANREVIEW_OLLAMA_HOST` (loopback only unless `PLANREVIEW_OLLAMA_ALLOW_REMOTE=1`), `PLANREVIEW_OLLAMA_MODEL`, `PLANREVIEW_OLLAMA_TIMEOUT`, `PLANREVIEW_OLLAMA_CHAT_TIMEOUT`, `PLANREVIEW_DATA_DIR`, `PLANREVIEW_API_SECRET`.
 >
@@ -105,14 +105,25 @@ The frontend must display `apply_result`; it must not compute its own gate.
 ### `GET /api/tasks/{id}/audit`
 `200 [{id, timestamp, kind, data}, …]` — persistent SQLite audit, in stored order. Kinds seen: `draft`, `human_confirmation`, `apply_result`, and others for each stage. Read-only.
 
+## Limits, pagination and retries
+
+- **Request size:** bodies over `PLANREVIEW_MAX_BODY_BYTES` (default 1,000,000) get 413 `REQUEST_TOO_LARGE`.
+- **Rate limits** (per process, token bucket): per credential subject 600 reads and 300 mutations per minute, per client address 1200 requests per minute (`PLANREVIEW_RATE_READ`, `_WRITE`, `_IP`; 0 disables). Over the limit: 429 `RATE_LIMITED` with `Retry-After`. `/api/health` is exempt.
+- **Pagination:** `GET /api/tasks?limit=&offset=` (default 100, max 500, newest first) and `GET /api/tasks/{id}/audit?limit=&offset=` (default 200). Bodies stay plain lists; the total is in the `X-Total-Count` header. Bad values: 422 `INVALID_PAGINATION`.
+- **Idempotency:** every mutating stage (`confirm`, `agent`, `plan`, `canonicalize`, `evaluate`, `resolve`, `apply`, `POST .../jobs`) and `POST /api/tasks` accept an `Idempotency-Key` header (8-128 chars of `A-Za-z0-9_-`). A retry with the same key and request returns the ORIGINAL response with `X-Idempotent-Replay: true`; the same key with a different request is 422 `IDEMPOTENCY_KEY_REUSED`. Keys are scoped per stage and task; failed attempts are not recorded, so a retry after an error really retries. Replay lookup is serialized in-process; across processes the state machine and version check still prevent a double execution.
+
 ## Supported Phase 1 operations (boundaries)
 
-Only two infrastructure edits are supported:
+Six infrastructure edits are supported (list them with `GET /api/capabilities`). Each is locked to ONE resource and ONE attribute: the pre-plan guard requires the workspace to equal the baseline plus exactly that edit, byte for byte, so any extra change is rejected before Terraform runs:
 
 | Operation | Resource | Attribute | Constraint |
 |---|---|---|---|
 | `update_memory` | `aws_lambda_function.dev_api` | `memory_size` | integer 128–10240 MB (1 MB increments) |
 | `update_tags` | `aws_s3_bucket.assets` | `tags.Team` | non-security `Team` tag only |
+| `update_timeout` | `aws_lambda_function.dev_api` | `timeout` | integer 1–900 seconds |
+| `set_lambda_env` | `aws_lambda_function.dev_api` | `environment.variables.NAME` | one UPPER_SNAKE_CASE variable; value `[A-Za-z0-9_.:/-]{1,64}`; names containing SECRET/PASSWORD/TOKEN/KEY/CREDENTIAL/PRIVATE/AUTH, `AWS_*` and `_*` are refused |
+| `set_s3_tag` | `aws_s3_bucket.assets` | `tags.<Key>` | one tag; the `Environment` tag (it drives policy) and `aws*` keys are refused |
+| `enable_s3_versioning` | `aws_s3_bucket.assets` | `versioning.enabled` | enabling only |
 
 Anything else (RDS, IAM, security groups, networking, deletes, compound requests) returns `UNSUPPORTED_OPERATION` or `AMBIGUOUS_REQUEST`. Replay-mode fixtures (`poisoned`, `review`, …) exist to demonstrate ALLOW/REVIEW/DENY on real Terraform plans and are not new capabilities.
 
@@ -140,7 +151,7 @@ Anything else (RDS, IAM, security groups, networking, deletes, compound requests
 - No per-stage progress or cancellation endpoint; long operations are a single blocking request.
 - No endpoint to read Cedar policy text or per-policy explanations beyond `determining_policies` ids and `reason`.
 - No resolver identity on `resolutions`; no evidence export endpoint (audit list only).
-- No endpoint listing supported operations (the capability registry is only visible through errors).
+- Supported operations are listed by `GET /api/capabilities`.
 
 ## Observed examples
 

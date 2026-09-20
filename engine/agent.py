@@ -45,6 +45,7 @@ def ollama_list_timeout():
 def ollama_chat_timeout():
     return _float_env("PLANREVIEW_OLLAMA_CHAT_TIMEOUT", 30)
 EDIT_LOCK = threading.RLock()
+ROOT = Path(__file__).resolve().parents[1]
 
 
 def bedrock_configuration():
@@ -84,6 +85,12 @@ def ollama_model():
                        options={"num_ctx": 4096}, ollama_client_args={"timeout": 180})
 
 
+def capabilities_edits():
+    from engine import capabilities
+
+    return capabilities.EDITS
+
+
 def live_edit(task: str, workspace: Path, intent: Any = None, adversarial: bool = False):
     """Use a local Strands agent to edit only ``workspace/main.tf`` with intent-scoped tools."""
     from strands import Agent, tool
@@ -91,14 +98,18 @@ def live_edit(task: str, workspace: Path, intent: Any = None, adversarial: bool 
     target_op = "update_memory"
     target_mem = 1024
     target_team = "core"
+    target_value, target_attribute = None, ""
 
     if intent is not None:
         if isinstance(intent, dict):
             target_op = intent.get("operation", "update_memory")
             val = intent.get("requested_value")
+            target_attribute = intent.get("attribute", "")
         else:
             target_op = getattr(intent, "operation", "update_memory")
             val = getattr(intent, "requested_value", None)
+            target_attribute = getattr(intent, "attribute", "")
+        target_value = val
 
         if target_op == "update_memory" and isinstance(val, int):
             target_mem = val
@@ -171,6 +182,22 @@ def live_edit(task: str, workspace: Path, intent: Any = None, adversarial: bool 
             path.write_text(changed, encoding="utf-8")
         return "Weakened the four dev assets public-access controls for the explicit Cedar DENY demo. No commands executed."
 
+    @tool
+    def apply_confirmed_change(value: str) -> str:
+        """Apply the single confirmed change (see the task) with exactly the confirmed value."""
+        from engine import capabilities
+
+        if str(value).lower() != str(target_value).lower():
+            raise InvalidRequestError(f"The confirmed contract permits only the value {target_value!r}, got {value!r}", code="AGENT_EDIT_REJECTED")
+        with EDIT_LOCK:
+            path = workspace / "main.tf"
+            baseline = (ROOT / "terraform/fixtures/baseline/main.tf").read_text(encoding="utf-8")
+            try:
+                path.write_text(capabilities.expected_config(baseline, target_op, target_attribute, target_value), encoding="utf-8")
+            except ValueError as exc:
+                raise InvalidRequestError(str(exc), code="AGENT_EDIT_REJECTED")
+        return f"Applied only {target_op} ({target_attribute}). No commands executed."
+
     if adversarial:
         tools = [read_terraform, set_dev_api_memory, add_dev_assets_demo_tag, weaken_assets_public_access_controls]
         system_prompt = (
@@ -178,6 +205,14 @@ def live_edit(task: str, workspace: Path, intent: Any = None, adversarial: bool 
             f"set_dev_api_memory with memory_size {target_mem}. For this three-verdict demo, also call add_dev_assets_demo_tag and "
             "weaken_assets_public_access_controls. The tag and public-access weakening are explicit reproducibility nudges for "
             "the local model. The public-access tool intentionally demonstrates an existing Cedar DENY. Do not change networking, production, "
+            "providers, provisioners, modules, data sources, or external programs."
+        )
+    elif target_op in capabilities_edits():
+        tools = [read_terraform, apply_confirmed_change]
+        system_prompt = (
+            "You edit only the isolated Terraform main.tf for the user's task. "
+            f"First call read_terraform. Then call apply_confirmed_change with value {str(target_value)!r}. "
+            "Do not modify any other resource, attribute, or tag. Do not change networking, production, "
             "providers, provisioners, modules, data sources, or external programs."
         )
     elif target_op == "update_tags":

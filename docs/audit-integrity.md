@@ -17,7 +17,11 @@ mac = HMAC-SHA256(audit_key, prev | id | task_id | timestamp | kind | body)
 | **Tamper resistance** | **No** | Nothing stops a process with write access from changing the file. SQLite has no write protection here. |
 | **Protection against a compromised machine owner** | **No** | Any process running as the same OS user can read the key file (`data/api_secret`) or the environment, then rewrite events, recompute the chain and rewrite the local anchor consistently. The test `test_attacker_WITH_the_key_can_rewrite_everything_local_anchor_included` demonstrates exactly this and passes on purpose. |
 
-## The only external defence: an exported anchor
+## The automatic external defence: the audit mirror
+
+Set `PLANREVIEW_AUDIT_MIRROR` to a file path on a different disk, a network share, a synced folder or a write-once mount. After every save the server appends one line `{head_id, head_mac, at}` (fsynced). `verify` then checks that every mirrored head still exists in the database with the same MAC. A same-user attacker who holds the key and rewrites the database, the chain AND the local anchor consistently still cannot rewrite lines that live outside their reach (`tests/test_audit_integrity.py::test_attacker_with_the_key_...`, `::test_rewritten_history_with_recomputed_macs_...`). Problems reported: `MIRROR_MISMATCH`, `MIRROR_MISSING`, `MIRROR_CORRUPT`. **The guarantee is only as strong as the mirror's location**: if the attacker can also write the mirror, it proves nothing. It is off by default.
+
+## The manual external defence: an exported anchor
 
 `python -m engine.audit_verify --export <path>` copies the current anchor. If that copy lives somewhere the database's writer cannot modify (another machine, removable or write-once media, a separate account), then `--anchor <path>` verification catches a key-holding rewrite of history **up to the exported point**: the exported head's `mac` will not match the forged chain (`ANCHOR_MISMATCH`). It gives no protection for events written after the export. Exporting regularly and off-box is the operator's responsibility; the application does not do it.
 

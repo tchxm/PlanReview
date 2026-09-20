@@ -1,7 +1,8 @@
-import os, json, shutil, subprocess, uuid, threading, re, hashlib
+import contextlib, os, json, shutil, subprocess, uuid, threading, re, hashlib
 from pathlib import Path
 from datetime import datetime, timezone
 from engine.storage import Store
+from engine import capabilities
 from engine.contract import draft, confirm
 from engine.types import Contract
 from engine.canonicalizer import canonicalize
@@ -9,6 +10,7 @@ from engine.evaluator import evaluate_all
 from engine.gate import apply_saved, digest
 from engine.intent import interpret
 from engine.guard import verify_workspace_configuration
+from engine.proc import report, run_tree
 from engine.exceptions import (
     DependencyError, IntegrityError, InvalidRequestError, StateConflictError, TerraformError,
 )
@@ -68,7 +70,11 @@ class Pipeline:
         from engine import auth as _auth
         from engine.storage import derive_audit_key
 
-        self.store = Store(self.data / "planreview.sqlite", key=derive_audit_key(_auth.load_secret(self.data)))
+        from engine.vault import Vault
+
+        secret = _auth.load_secret(self.data)
+        self.vault = Vault(secret)
+        self.store = Store(self.data / "planreview.sqlite", key=derive_audit_key(secret), vault=self.vault)
 
     def create(self, task, mode="replay"):
         if mode not in ["replay", "adversarial", "ollama", "live"]:
@@ -155,6 +161,12 @@ class Pipeline:
                 rep = f'resource "aws_s3_bucket" "assets" {{\n  bucket = "planreview-demo-assets"\n  tags = {{ Environment = "dev", Team = "{team}" }}\n}}'
                 (workspace / "main.tf").write_text(w_main.replace('resource "aws_s3_bucket" "assets" {\n  bucket = "planreview-demo-assets"\n  tags = { Environment = "dev" }\n}', rep), encoding="utf-8")
                 log = f"Replay applied validated Team={team} tag to assets S3 bucket"
+            elif intent and intent.get("operation") in capabilities.EDITS:
+                base = (ROOT / "terraform/fixtures/baseline/main.tf").read_text(encoding="utf-8")
+                (workspace / "main.tf").write_text(
+                    capabilities.expected_config(base, intent["operation"], intent["attribute"], intent["requested_value"]), encoding="utf-8"
+                )
+                log = f"Replay applied validated {intent['operation']} ({intent['attribute']} = {intent['requested_value']!r})"
             else:
                 shutil.copy2(ROOT / "terraform/fixtures/intended/main.tf", workspace / "main.tf")
         else:
@@ -181,8 +193,9 @@ class Pipeline:
 
         env = os.environ.copy()
         env["TF_PLUGIN_CACHE_DIR"] = str(ROOT / ".provider-cache")
+        report(f"terraform {args[0]}")
         try:
-            p = subprocess.run(
+            p = run_tree(
                 ["terraform", *args],
                 cwd=path,
                 env=env,
@@ -240,14 +253,17 @@ class Pipeline:
         raw = self.command(["show", "-json", str(plan_path)], path)
         raw_path = path / f"{rid}.json"
         raw_path.write_text(raw)
+        plan_hash, raw_hash = digest(plan_path), digest(raw_path)
+        self.vault.seal(plan_path)  # plaintext plan artifacts never rest on disk (see engine/vault.py)
+        self.vault.seal(raw_path)
         run = dict(
             id=rid,
             created_at=datetime.now(timezone.utc).isoformat(),
             workspace=str(path),
             plan_path=str(plan_path),
-            plan_hash=digest(plan_path),
+            plan_hash=plan_hash,
             raw_path=str(raw_path),
-            raw_hash=digest(raw_path),
+            raw_hash=raw_hash,
             plan_stdout=log,
             canonical=None,
             verdicts=None,
@@ -264,11 +280,15 @@ class Pipeline:
         t = self.store.get(id)
         assert_contract_integrity(t)
         run = self.latest(t)
-        if digest(run["raw_path"]) != run["raw_hash"]:
+        try:
+            raw_ok = self.vault.digest(run["raw_path"]) == run["raw_hash"]
+        except (OSError, ValueError):
+            raw_ok = False
+        if not raw_ok:
             raise IntegrityError("Raw plan hash mismatch", code="PLAN_INTEGRITY_FAILED")
         run["canonical"] = [
             c.model_dump()
-            for c in canonicalize(json.loads(Path(run["raw_path"]).read_text()))
+            for c in canonicalize(json.loads(self.vault.read_text(run["raw_path"])))
         ]
         t["stage"] = "canonicalized"
         self.store.save(t, "canonical", run)
@@ -296,7 +316,7 @@ class Pipeline:
         self.store.save(t, "verdicts", run)
         return t
 
-    def resolve(self, id, resolutions):
+    def resolve(self, id, resolutions, actor=None):
         t = self.store.get(id)
         assert_contract_integrity(t)
         run = self.latest(t)
@@ -327,13 +347,15 @@ class Pipeline:
                     code="RESOLUTION_NOT_ALLOWED",
                 )
         run["resolutions"].update(resolutions)
+        at = datetime.now(timezone.utc).isoformat()
+        run.setdefault("resolution_actors", {}).update({a: {"by": actor, "at": at} for a in resolutions})
         t["stage"] = "resolved"
         self.store.save(
-            t, "human_resolution", {"run_id": run["id"], "resolutions": resolutions}
+            t, "human_resolution", {"run_id": run["id"], "resolutions": resolutions, "by": actor, "at": at}
         )
         return t
 
-    def apply(self, id):
+    def apply(self, id, actor=None):
         from engine.evaluator import POLICY
 
         t = self.store.get(id)
@@ -352,10 +374,12 @@ class Pipeline:
             raise StateConflictError(
                 "Policies changed; evaluate again and resolve the new verdicts", code="POLICY_CHANGED"
             )
-        run["apply_result"] = apply_saved(
-            Contract.model_validate(t["contract"]), run, run["resolutions"]
-        )
+        with self.vault.unsealed(run["plan_path"]) if run.get("plan_path") else contextlib.nullcontext():
+            run["apply_result"] = apply_saved(
+                Contract.model_validate(t["contract"]), run, run["resolutions"]
+            )
         t["stage"] = run["apply_result"]["status"].lower()
+        run["apply_result"]["requested_by"] = actor
         self.store.save(t, "apply_result", run["apply_result"])
         return t
 

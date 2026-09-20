@@ -16,7 +16,7 @@ The pipeline has discrete API calls: create/draft → confirm → edit → plan 
 
 ## Processes
 
-FastAPI serves the production React bundle and JSON API. Terraform and Cedar's native binding execute on the backend; Cedar does not require a daemon. Vite is optional for frontend development. A process-local lock serializes API mutations; run a single Uvicorn worker.
+FastAPI serves the production React bundle and JSON API. Terraform and Cedar's native binding execute on the backend; Cedar does not require a daemon. Vite is optional for frontend development. Task writes are optimistic compare-and-set on a version column, so several API processes can share one database; long operations run as durable background jobs (see `docs/backend-hardening-status.md`, item F).
 
 ## Supported limits
 

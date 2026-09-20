@@ -17,7 +17,6 @@ from engine.exceptions import (
     UnsupportedOperationError,
 )
 
-SUPPORTED_OPERATIONS = {"update_memory", "update_tags"}
 
 CAPABILITY_REGISTRY = {
     "update_memory": {
@@ -40,6 +39,12 @@ CAPABILITY_REGISTRY = {
         "description": "Update non-security Team tag on development assets S3 bucket",
     },
 }
+
+from engine import capabilities as _caps  # noqa: E402
+
+CAPABILITY_REGISTRY.update(_caps.registry_view())
+SUPPORTED_OPERATIONS = set(CAPABILITY_REGISTRY)
+_EXTRA_OPS_TEXT = ", ".join(f"{op} ({CAPABILITY_REGISTRY[op]['description']})" for op in _caps.EDITS)
 
 UNSUPPORTED_KEYWORDS = [
     r"\bec2\b",
@@ -83,7 +88,7 @@ def validate_capability(proposal: IntentProposal) -> tuple[bool, str, str | None
         return (
             False,
             f"Operation '{op}' is not supported. Genuine supported operations in Phase 1: "
-            f"update_memory (aws_lambda_function.dev_api), update_tags (aws_s3_bucket.assets Team tag).",
+            f"update_memory (aws_lambda_function.dev_api), update_tags (aws_s3_bucket.assets Team tag); also {_EXTRA_OPS_TEXT}.",
             "UNSUPPORTED_OPERATION",
         )
 
@@ -103,7 +108,14 @@ def validate_capability(proposal: IntentProposal) -> tuple[bool, str, str | None
             "UNSUPPORTED_OPERATION",
         )
 
-    if proposal.attribute != cap["attribute"]:
+    if "attribute_pattern" in cap:
+        if not re.fullmatch(cap["attribute_pattern"], str(proposal.attribute)):
+            return (
+                False,
+                f"Attribute '{proposal.attribute}' is not authorized. Permitted attribute pattern for {op}: '{cap['attribute_pattern']}'.",
+                "UNSUPPORTED_OPERATION",
+            )
+    elif proposal.attribute != cap["attribute"]:
         return (
             False,
             f"Attribute '{proposal.attribute}' is not authorized. Permitted attribute for {op}: '{cap['attribute']}'.",
@@ -137,8 +149,63 @@ def validate_capability(proposal: IntentProposal) -> tuple[bool, str, str | None
                 f"Tag value must be alphanumeric/hyphen/underscore (1-32 chars), got {val!r}.",
                 "UNSUPPORTED_OPERATION",
             )
+    elif op in _caps.EDITS:
+        problem = _caps.check_value(op, str(proposal.attribute), val)
+        if problem:
+            return False, problem, "UNSUPPORTED_OPERATION"
 
     return True, "Operation validated against supported capability registry.", None
+
+
+_LAMBDA_WORDS = ("lambda", "dev-api", "dev_api", "function")
+_BUCKET_WORDS = ("bucket", "s3", "assets")
+
+
+def _proposal(op, attribute, value, task):
+    cap = CAPABILITY_REGISTRY[op]
+    return IntentProposal(
+        operation=op,
+        resource_address=cap["resource_address"],
+        resource_type=cap["resource_type"],
+        attribute=attribute,
+        requested_value=value,
+        raw_task=task,
+    )
+
+
+def _extract_extended(task: str, lower: str) -> IntentProposal | None:
+    """Phrases for the registry operations added after the original two. Returns None when the task is not one of them."""
+    on_lambda = any(w in lower for w in _LAMBDA_WORDS)
+    on_bucket = any(w in lower for w in _BUCKET_WORDS)
+
+    if "versioning" in lower and on_bucket:
+        return _proposal("enable_s3_versioning", "versioning.enabled", not re.search(r"\b(disable|suspend|turn off)\b", lower), task)
+
+    if "timeout" in lower and on_lambda:
+        m = re.search(r"(-?\d+)\s*(?:s|sec|secs|second|seconds)?\b", lower)
+        return _proposal("update_timeout", "timeout", int(m.group(1)) if m else 30, task)
+
+    if re.search(r"\b(env(?:ironment)?\s*(?:var|variable)s?)\b", lower) and on_lambda:
+        m = re.search(r"\b([A-Za-z][A-Za-z0-9_]{0,31})\s*(?:=|to|:)\s*([A-Za-z0-9_.:/-]{1,64})", task.split("variable", 1)[-1].split("var ", 1)[-1])
+        if not m:
+            raise UnsupportedOperationError(
+                "Say which variable and value, for example: set environment variable LOG_LEVEL=debug on the dev-api Lambda.",
+                details={"task": task},
+            )
+        return _proposal("set_lambda_env", f"environment.variables.{m.group(1).upper()}", m.group(2), task)
+
+    if "tag" in lower and on_bucket and not re.search(r"\bteam\b", lower):
+        stop = {"the", "a", "an", "bucket", "s3", "assets", "dev", "our", "my"}
+        for pat in (
+            r"\btag\s+([A-Za-z][A-Za-z0-9_-]*)\s*(=|:|to)\s*([A-Za-z0-9_-]+)",
+            r"\b([A-Za-z][A-Za-z0-9_-]*)\s+tag\s*(=|:|to)\s*([A-Za-z0-9_-]+)",
+            r"\b([A-Za-z][A-Za-z0-9_-]*)\s+tag\s+()([A-Za-z0-9_-]+)",
+        ):
+            m = re.search(pat, task, re.IGNORECASE)
+            if m and not (m.group(2) in ("to", "") and m.group(3).lower() in stop) and m.group(1).lower() not in stop | {"add", "set", "update", "new"}:
+                key = m.group(1)
+                return _proposal("set_s3_tag", f"tags.{key[0].upper()}{key[1:]}", m.group(3), task)
+    return None
 
 
 def extract_deterministic_intent(task: str) -> IntentProposal:
@@ -209,6 +276,10 @@ def extract_deterministic_intent(task: str) -> IntentProposal:
                 details={"task": task, "pattern": pat},
             )
 
+    extra = _extract_extended(task, lower)
+    if extra is not None:
+        return extra
+
     # Check for S3 tag update
     if any(k in lower for k in ["tag", "team"]) and any(
         k in lower for k in ["assets", "bucket", "s3"]
@@ -260,6 +331,8 @@ def extract_deterministic_intent(task: str) -> IntentProposal:
 # Normalisation removes case and punctuation. A name is mapped only if it is listed here for the
 # stated operation; anything else (including anything ambiguous) is left as-is and rejected by
 # validate_capability. Nothing here ever widens the supported scope.
+_LAMBDA_NAMES = ("awslambdafunctiondevapi", "devapilambda", "devapi", "devapilambdafunction", "lambdadevapi", "lambdafunctiondevapi", "devapifunction")
+_BUCKET_NAMES = ("awss3bucketassets", "assetsbucket", "assets", "devassetsbucket", "devassets", "assetss3bucket", "s3assets", "planreviewdemoassets")
 _NAME_ALLOWLIST = {
     "update_memory": {
         "aws_lambda_function.dev_api": ("awslambdafunctiondevapi", "devapilambda", "devapi", "devapilambdafunction", "lambdadevapi", "lambdafunctiondevapi", "devapifunction"),
@@ -268,6 +341,12 @@ _NAME_ALLOWLIST = {
         "aws_s3_bucket.assets": ("awss3bucketassets", "assetsbucket", "assets", "devassetsbucket", "devassets", "assetss3bucket", "s3assets", "planreviewdemoassets"),
     },
 }
+
+
+for _op in ("update_timeout", "set_lambda_env"):
+    _NAME_ALLOWLIST[_op] = {"aws_lambda_function.dev_api": _LAMBDA_NAMES}
+for _op in ("set_s3_tag", "enable_s3_versioning"):
+    _NAME_ALLOWLIST[_op] = {"aws_s3_bucket.assets": _BUCKET_NAMES}
 
 
 def _norm(name):
@@ -331,14 +410,18 @@ def extract_llm_intent(task: str) -> IntentProposal:
         "Allowed operations in Phase 1: "
         "1. 'update_memory': for updating aws_lambda_function.dev_api memory_size. "
         "2. 'update_tags': for setting Team tag on aws_s3_bucket.assets. "
-        "3. 'unsupported': for any other resource, service (EC2, VPC, IAM, RDS), deletion, or arbitrary edit. "
+        "3. 'update_timeout': aws_lambda_function.dev_api, attribute 'timeout', integer 1-900 seconds. "
+        "4. 'set_lambda_env': aws_lambda_function.dev_api, attribute 'environment.variables.NAME' (UPPER_SNAKE_CASE), string value. "
+        "5. 'set_s3_tag': aws_s3_bucket.assets, attribute 'tags.Key', string value (never Environment). "
+        "6. 'enable_s3_versioning': aws_s3_bucket.assets, attribute 'versioning.enabled', requested_value true. "
+        "7. 'unsupported': for any other resource, service (EC2, VPC, IAM, RDS), deletion, or arbitrary edit. "
         "Output JSON schema: "
         "{\n"
-        '  "operation": "update_memory" | "update_tags" | "unsupported",\n'
+        '  "operation": "update_memory" | "update_tags" | "update_timeout" | "set_lambda_env" | "set_s3_tag" | "enable_s3_versioning" | "unsupported",\n'
         '  "resource_address": "aws_lambda_function.dev_api" | "aws_s3_bucket.assets" | "unsupported",\n'
         '  "resource_type": "aws_lambda_function" | "aws_s3_bucket" | "unsupported",\n'
-        '  "attribute": "memory_size" | "tags.Team" | "unsupported",\n'
-        '  "requested_value": <integer for memory_size, string for tags.Team, or null>\n'
+        '  "attribute": "memory_size" | "tags.Team" | "timeout" | "environment.variables.NAME" | "tags.Key" | "versioning.enabled" | "unsupported",\n'
+        '  "requested_value": <integer for memory_size/timeout, string for tags and environment variables, true for versioning, or null>\n'
         "}\n"
         "Return strictly valid JSON only. No explanation or markdown."
     )

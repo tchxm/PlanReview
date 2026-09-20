@@ -21,7 +21,7 @@ def test_deny_preserves_real_aws_state():
             v.model_dump() for v in evaluate_all(contract(), changes("poisoned"))
         ]
     }
-    with patch("engine.gate.subprocess.run") as spawn:
+    with patch("engine.gate.run_tree") as spawn:
         result = apply_saved(contract(), run, {})
         spawn.assert_not_called()
     after = tf(["show", "-json", "terraform.tfstate"], path)
@@ -102,7 +102,7 @@ def test_missing_canonical_blocks_apply(tmp_path):
         "verdicts": [],
         "workspace": str(tmp_path),
     }
-    with patch("engine.gate.subprocess.run") as mock_spawn:
+    with patch("engine.gate.run_tree") as mock_spawn:
         res = apply_saved(c, run_missing, {})
         mock_spawn.assert_not_called()
     assert res["status"] == "BLOCKED"
@@ -117,7 +117,7 @@ def test_missing_canonical_blocks_apply(tmp_path):
         "canonical": None,
         "workspace": str(tmp_path),
     }
-    with patch("engine.gate.subprocess.run") as mock_spawn:
+    with patch("engine.gate.run_tree") as mock_spawn:
         res2 = apply_saved(c, run_none, {})
         mock_spawn.assert_not_called()
     assert res2["status"] == "BLOCKED"

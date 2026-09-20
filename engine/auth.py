@@ -11,6 +11,7 @@ import base64
 import hashlib
 import hmac
 import os
+import re
 import secrets
 import time
 from pathlib import Path
@@ -21,9 +22,9 @@ MIN_SECRET_LEN = 32
 
 
 class AuthError(Exception):
-    def __init__(self, code, message, status=401):
+    def __init__(self, code, message, status=401, retry_after=None):
         super().__init__(message)
-        self.code, self.message, self.status = code, message, status
+        self.code, self.message, self.status, self.retry_after = code, message, status, retry_after
 
 
 def _b64(raw: bytes) -> str:
@@ -43,31 +44,51 @@ def load_secret(data_dir=None):
         fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
         with os.fdopen(fd, "w") as f:
             f.write(secrets.token_hex(32))
+        _owner_only(path)
     return path.read_text().strip().encode()
+
+
+def _owner_only(path):
+    """0o600 is meaningless on Windows: drop inherited ACLs and grant only the current user (best effort)."""
+    if os.name != "nt":
+        return
+    import subprocess
+
+    try:
+        subprocess.run(["icacls", str(path), "/inheritance:r", "/grant:r", f"{os.environ.get('USERNAME', '')}:F"], capture_output=True, timeout=15)
+    except Exception:
+        pass
 
 
 def _sig(secret: bytes, body: str) -> str:
     return _b64(hmac.new(secret, body.encode(), hashlib.sha256).digest())
 
 
-def mint(secret: bytes, scopes, ttl_seconds: int, now=None) -> str:
+_SUB = re.compile(r"^[A-Za-z0-9_@\-]{1,64}$")
+
+
+def mint(secret: bytes, scopes, ttl_seconds: int, now=None, sub="local", jti=None) -> str:
+    """v2 token: v2.<sub>.<scopes>.<exp>.<jti>.<sig>. `sub` is the accountable identity; `jti` allows revocation."""
     scopes = sorted(set(scopes))
     if not scopes or not set(scopes) <= SCOPES:
         raise ValueError(f"scopes must be a non-empty subset of {sorted(SCOPES)}")
     if not 1 <= ttl_seconds <= MAX_TTL:
         raise ValueError(f"ttl must be 1..{MAX_TTL} seconds")
+    if not _SUB.match(sub or ""):
+        raise ValueError("sub must be 1-64 characters of A-Z a-z 0-9 _ @ -")
+    jti = jti or secrets.token_hex(8)
     exp = int((now if now is not None else time.time()) + ttl_seconds)
-    body = f"v1.{'+'.join(scopes)}.{exp}"
+    body = f"v2.{sub}.{'+'.join(scopes)}.{exp}.{jti}"
     return f"{body}.{_sig(secret, body)}"
 
 
 def verify(secret: bytes, token: str, now=None):
-    """Return (scopes:set, exp:int) or raise AuthError."""
+    """Return {sub, scopes:set, exp:int, jti} or raise AuthError. Revocation is checked by the caller."""
     parts = (token or "").split(".")
-    if len(parts) != 4 or parts[0] != "v1":
+    if len(parts) != 6 or parts[0] != "v2":
         raise AuthError("AUTH_INVALID", "Malformed credential")
-    _, scope_s, exp_s, sig = parts
-    body = f"v1.{scope_s}.{exp_s}"
+    _, sub, scope_s, exp_s, jti, sig = parts
+    body = f"v2.{sub}.{scope_s}.{exp_s}.{jti}"
     if not hmac.compare_digest(sig, _sig(secret, body)):
         raise AuthError("AUTH_INVALID", "Invalid credential")
     try:
@@ -77,9 +98,9 @@ def verify(secret: bytes, token: str, now=None):
     if (now if now is not None else time.time()) >= exp:
         raise AuthError("AUTH_EXPIRED", "Credential expired")
     scopes = set(scope_s.split("+"))
-    if not scopes <= SCOPES:
+    if not scopes <= SCOPES or not _SUB.match(sub):
         raise AuthError("AUTH_INVALID", "Invalid credential")
-    return scopes, exp
+    return {"sub": sub, "scopes": scopes, "exp": exp, "jti": jti}
 
 
 def parse_bearer(header):
@@ -103,5 +124,14 @@ if __name__ == "__main__":
     ap.add_argument("--scopes", default="read,write", help="comma list of: read, write, evidence")
     ap.add_argument("--ttl", default="8h", help="e.g. 30m, 8h, 7d")
     ap.add_argument("--data", default=None, help="data directory containing api_secret")
+    ap.add_argument("--sub", default="local", help="accountable identity recorded on approvals")
+    ap.add_argument("--revoke", default=None, metavar="JTI", help="revoke the token with this id instead of minting")
     a = ap.parse_args()
-    print(mint(load_secret(a.data), a.scopes.split(","), _parse_ttl(a.ttl)))
+    if a.revoke:
+        from engine.storage import Store, derive_audit_key
+
+        d = Path(a.data or Path(__file__).resolve().parents[1] / "data")
+        Store(d / "planreview.sqlite", key=derive_audit_key(load_secret(a.data))).revoke(a.revoke, "cli")
+        print(f"revoked {a.revoke}")
+    else:
+        print(mint(load_secret(a.data), a.scopes.split(","), _parse_ttl(a.ttl), sub=a.sub))

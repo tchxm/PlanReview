@@ -48,7 +48,7 @@ def test_gate_stays_closed_and_never_spawns_terraform_apply_via_api(client, monk
     tid = run_to_evaluated(client, "poisoned")
     spawned = []
     real = __import__("subprocess").run
-    monkeypatch.setattr("engine.gate.subprocess.run", lambda *a, **k: spawned.append(a) or real(*a, **k))
+    monkeypatch.setattr("engine.gate.run_tree", lambda *a, **k: spawned.append(a) or real(*a, **k))
     r = client.post(f"/api/tasks/{tid}/apply")
     assert r.status_code == 200
     assert r.json()["runs"][-1]["apply_result"]["status"] == "BLOCKED" and not spawned

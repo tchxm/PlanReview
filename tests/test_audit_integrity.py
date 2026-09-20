@@ -175,3 +175,54 @@ def test_concurrent_writers_keep_a_valid_chain(tmp_path):
     r = p.store.verify_audit()
     assert r["ok"], r["problems"][:3]
     assert r["checked"] == 6 + 6 * 15
+
+
+# --------------------------------------------- external append-only mirror
+def _mirrored(tmp_path):
+    mirror = tmp_path / "elsewhere" / "audit_mirror.jsonl"
+    s = Store(tmp_path / "db.sqlite", key=derive_audit_key(SECRET), mirror_path=mirror)
+    for i in range(4):
+        s.save({"id": f"t{i}", "n": i}, "draft")
+    return s, mirror, tmp_path / "db.sqlite"
+
+
+def test_mirror_records_every_head_and_verifies(tmp_path):
+    s, mirror, _ = _mirrored(tmp_path)
+    assert len(mirror.read_text().splitlines()) == 4
+    assert s.verify_audit()["ok"]
+
+
+def test_attacker_with_the_key_who_truncates_and_rewrites_the_local_anchor_is_still_caught(tmp_path):
+    s, mirror, db = _mirrored(tmp_path)
+    raw(db, "DELETE FROM events WHERE id > 2")
+    head = raw(db, "SELECT id, mac FROM events ORDER BY id DESC LIMIT 1")[0]
+    s.anchor_path.write_text(json.dumps({"algo": "hmac-sha256-chain-v1", "head_id": head[0], "head_mac": head[1], "protected_events": 2, "updated_at": "x"}))
+    r = s.verify_audit()
+    assert not r["ok"] and "MIRROR_MISMATCH" in types(r)  # the local anchor now agrees, the mirror does not
+
+
+def test_rewritten_history_with_recomputed_macs_is_caught_by_the_mirror(tmp_path):
+    s, mirror, db = _mirrored(tmp_path)
+    rows = raw(db, "SELECT id, task_id, timestamp, kind, body FROM events ORDER BY id")
+    prev = "0" * 64
+    for id_, tid, ts, kind, body in rows:  # attacker edits event 1 and re-chains everything with the stolen key
+        body = body.replace('"n": 0', '"n": 999') if id_ == 1 else body
+        mac = s._mac(prev, id_, tid, ts, kind, body)
+        raw(db, "UPDATE events SET body=?, prev=?, mac=? WHERE id=?", body, prev, mac, id_)
+        prev = mac
+    s._write_anchor(rows[-1][0], prev)
+    r = s.verify_audit()
+    assert not r["ok"] and "MIRROR_MISMATCH" in types(r)
+
+
+def test_deleted_mirror_is_reported(tmp_path):
+    s, mirror, _ = _mirrored(tmp_path)
+    mirror.unlink()
+    r = s.verify_audit()
+    assert not r["ok"] and "MIRROR_MISSING" in types(r)
+
+
+def test_mirror_is_optional(tmp_path):
+    s = Store(tmp_path / "db.sqlite", key=derive_audit_key(SECRET))
+    s.save({"id": "t"}, "draft")
+    assert s.verify_audit()["ok"]

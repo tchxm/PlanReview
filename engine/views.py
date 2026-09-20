@@ -4,7 +4,7 @@ stays server side and is only served by the evidence-scoped endpoint."""
 import hashlib
 
 RUN_HIDDEN = {"workspace", "plan_path", "raw_path", "plan_stdout", "raw_plan"}
-TASK_HIDDEN = {"workspace"}
+TASK_HIDDEN = {"workspace", "_version"}
 
 
 def plan_summary(canonical):

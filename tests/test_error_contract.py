@@ -140,7 +140,7 @@ def _prepared(client):
 
 def test_terraform_missing_is_503(client, monkeypatch):
     tid = _prepared(client)
-    monkeypatch.setattr("engine.pipeline.subprocess.run", lambda *a, **k: (_ for _ in ()).throw(FileNotFoundError("terraform")))
+    monkeypatch.setattr("engine.pipeline.run_tree", lambda *a, **k: (_ for _ in ()).throw(FileNotFoundError("terraform")))
     r = client.post(f"/api/tasks/{tid}/plan")
     assert r.status_code == 503 and err(r)["error"] == "TERRAFORM_UNAVAILABLE"
 
@@ -151,7 +151,7 @@ def test_terraform_timeout_is_504(client, monkeypatch):
     def boom(*a, **k):
         raise subprocess.TimeoutExpired("terraform", 180)
 
-    monkeypatch.setattr("engine.pipeline.subprocess.run", boom)
+    monkeypatch.setattr("engine.pipeline.run_tree", boom)
     r = client.post(f"/api/tasks/{tid}/plan")
     assert r.status_code == 504 and err(r)["error"] == "TERRAFORM_TIMEOUT"
 
@@ -159,7 +159,7 @@ def test_terraform_timeout_is_504(client, monkeypatch):
 def test_terraform_failure_is_502_and_raw_output_stays_in_the_server_log(client, monkeypatch, caplog):
     tid = _prepared(client)
     leak = "Error: cannot read C:\\Users\\victim\\secrets\\terraform.tfvars value=SUPER-SECRET-VALUE"
-    monkeypatch.setattr("engine.pipeline.subprocess.run", lambda *a, **k: subprocess.CompletedProcess(a, 1, stdout="", stderr=leak))
+    monkeypatch.setattr("engine.pipeline.run_tree", lambda *a, **k: subprocess.CompletedProcess(a, 1, stdout="", stderr=leak))
     with caplog.at_level(logging.ERROR, logger="planreview"):
         r = client.post(f"/api/tasks/{tid}/plan")
     assert r.status_code == 502 and err(r)["error"] == "TERRAFORM_FAILED"
@@ -169,7 +169,7 @@ def test_terraform_failure_is_502_and_raw_output_stays_in_the_server_log(client,
 
 # ---- 500 and route errors ---------------------------------------------------
 def test_unexpected_failure_is_500_without_leaking(client, monkeypatch, caplog):
-    def boom():
+    def boom(*args, **kwargs):
         raise RuntimeError("db exploded at C:\\secret\\place with token=ABC123")
 
     monkeypatch.setattr(api.pipeline.store, "list", boom)

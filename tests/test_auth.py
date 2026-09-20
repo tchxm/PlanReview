@@ -22,6 +22,7 @@ ENDPOINTS = [
     ("GET", "/api/tasks/x/audit"),
     ("GET", "/api/tasks/x/evidence/1"),
     ("GET", "/api/auth/whoami"),
+    ("POST", "/api/auth/revoke"),
 ]
 
 
@@ -45,7 +46,8 @@ def test_health_is_public_and_leaks_nothing():
     assert r.status_code == 200
     body = r.json()
     assert body["auth"] == "required" and body["cloud_apply"] is False
-    assert set(body) == {"status", "evaluator", "cloud_apply", "auth", "api_version"}
+    assert set(body) == {"status", "evaluator", "cloud_apply", "emulator_apply", "auth", "api_version"}
+    assert body["emulator_apply"] is False
 
 
 @pytest.mark.parametrize("method,path", ENDPOINTS)
@@ -79,8 +81,8 @@ def test_token_signed_with_another_secret_is_rejected():
 
 def test_tampered_scope_or_expiry_invalidates_signature():
     t = token(["read"])
-    _, scope, exp, sig = t.split(".")
-    for forged in (f"v1.read+write.{exp}.{sig}", f"v1.{scope}.{int(exp) + 99999}.{sig}"):
+    _, sub, scope, exp, jti, sig = t.split(".")
+    for forged in (f"v2.{sub}.read+write.{exp}.{jti}.{sig}", f"v2.{sub}.{scope}.{int(exp) + 99999}.{jti}.{sig}", f"v2.admin.{scope}.{exp}.{jti}.{sig}"):
         r = send(anon(), "POST", "/api/tasks", {"Authorization": "Bearer " + forged})
         assert r.status_code == 401 and code(r) == "AUTH_INVALID"
 
@@ -146,3 +148,36 @@ def test_generated_secret_file_is_created_once_and_not_in_repo(tmp_path, monkeyp
     assert (tmp_path / "api_secret").exists()
     # data/ is gitignored, so a generated secret can never be committed by accident
     assert "data/" in open(".gitignore").read()
+
+
+def test_whoami_reports_identity():
+    r = anon().get("/api/auth/whoami", headers={"Authorization": "Bearer " + auth.mint(SECRET, ["read"], 600, sub="alice@corp")})
+    assert r.json()["sub"] == "alice@corp"
+
+
+def test_mint_rejects_bad_subject():
+    for bad in ("", "a.b", "x" * 65, "sp ace"):
+        with pytest.raises(ValueError):
+            auth.mint(SECRET, ["read"], 60, sub=bad)
+
+
+def test_revoked_token_is_rejected_immediately_others_unaffected(tmp_path, monkeypatch):
+    monkeypatch.setattr(api, "pipeline", Pipeline(tmp_path))
+    t1 = auth.mint(SECRET, ["read"], 600, sub="alice")
+    t2 = auth.mint(SECRET, ["read"], 600, sub="bob")
+    h1, h2 = {"Authorization": "Bearer " + t1}, {"Authorization": "Bearer " + t2}
+    c = anon()
+    assert c.get("/api/tasks", headers=h1).status_code == 200
+    assert c.post("/api/auth/revoke", headers=h1).json() == {"revoked": True}
+    r = c.get("/api/tasks", headers=h1)
+    assert r.status_code == 401 and code(r) == "AUTH_REVOKED"
+    assert c.get("/api/tasks", headers=h2).status_code == 200
+
+
+def test_revocation_survives_restart(tmp_path, monkeypatch):
+    monkeypatch.setattr(api, "pipeline", Pipeline(tmp_path))
+    t = auth.mint(SECRET, ["read"], 600)
+    anon().post("/api/auth/revoke", headers={"Authorization": "Bearer " + t})
+    monkeypatch.setattr(api, "pipeline", Pipeline(tmp_path))
+    r = anon().get("/api/tasks", headers={"Authorization": "Bearer " + t})
+    assert r.status_code == 401 and code(r) == "AUTH_REVOKED"

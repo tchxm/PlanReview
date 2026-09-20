@@ -9,6 +9,8 @@ import os
 TEST_SECRET = "test-only-secret-" + "x" * 32
 os.environ["PLANREVIEW_API_SECRET"] = TEST_SECRET
 os.environ.pop("PLANREVIEW_INSECURE_NO_AUTH", None)
+os.environ["PLANREVIEW_ENCRYPT_AT_REST"] = "0"  # legacy tests read plan artifacts directly; test_vault.py turns it on
+os.environ.update({"PLANREVIEW_RATE_READ": "0", "PLANREVIEW_RATE_WRITE": "0", "PLANREVIEW_RATE_IP": "0"})
 
 import starlette.testclient as _tc  # noqa: E402
 

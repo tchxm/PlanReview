@@ -1,7 +1,11 @@
 fastapi>=0.115,<1
 uvicorn>=0.34,<1
 pydantic>=2.10,<3
+python-hcl2>=8,<9
+cryptography>=44
 cedarpy>=4.8,<5
 strands-agents[ollama]>=1,<2
 pytest>=8,<10
+moto[server]>=5,<6
+boto3>=1.35
 httpx>=0.28,<1

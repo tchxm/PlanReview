@@ -427,7 +427,7 @@ def test_cedar_failure_cannot_be_approved_in_resolve_or_apply(tmp_path):
 
     # Attempt to apply -> Gate MUST BLOCK with explicit evaluation error reason
     c = Contract.model_validate(t["contract"])
-    with patch("engine.gate.subprocess.run") as mock_spawn:
+    with patch("engine.gate.run_tree") as mock_spawn:
         res = apply_saved(c, run, {"aws_lambda_function.dev_api": "approve"})
         mock_spawn.assert_not_called()
 
@@ -524,7 +524,7 @@ def test_direct_deny_never_starts_terraform_apply():
         "verdicts": [{"address": "aws_s3_bucket_public_access_block.assets", "verdict": "DENY"}],
         "canonical": [{"address": "aws_s3_bucket_public_access_block.assets", "resource_type": "aws_s3_bucket_public_access_block"}],
     }
-    with patch("engine.gate.subprocess.run") as mock_spawn:
+    with patch("engine.gate.run_tree") as mock_spawn:
         res = apply_saved(c, run, {})
         mock_spawn.assert_not_called()
 

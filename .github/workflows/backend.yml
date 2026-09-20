@@ -1,10 +1,10 @@
-# Backend verification matrix. NOT yet executed on GitHub by the author: Windows was verified
-# locally; Linux and macOS are UNVERIFIED until this workflow runs (see docs/backend-hardening-status.md).
+# Backend verification matrix. Windows and Ubuntu (WSL2) were verified locally with these same steps;
+# macOS is UNVERIFIED until this workflow runs (see docs/backend-hardening-status.md).
 name: backend
 on:
   workflow_dispatch:
   pull_request:
-    paths: ["engine/**", "tests/**", "cedar/**", "terraform/**", "requirements.txt", ".github/workflows/backend.yml"]
+    paths: ["engine/**", "tests/**", "tools/**", "cedar/**", "terraform/**", "requirements.txt", ".github/workflows/backend.yml"]
 
 jobs:
   test:

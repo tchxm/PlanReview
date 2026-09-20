@@ -7,7 +7,7 @@ import hashlib
 import json
 import re
 
-from fastapi import Depends, FastAPI, Header, Request
+from fastapi import Depends, FastAPI, Header, Request, Response
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field, ValidationError
@@ -20,8 +20,12 @@ from engine.exceptions import (
     InvalidRequestError,
     NotFoundError,
     PlanReviewError,
+    StateConflictError,
     TerraformError,
 )
+from engine.gate import emulator_endpoint as gate_emulator
+from engine.jobs import JobRunner
+from engine import ratelimit
 from engine.pipeline import LOCKS, Pipeline
 from engine.sanitize import scrub
 from engine.views import audit_view, task_view
@@ -45,6 +49,9 @@ INSECURE = os.environ.get("PLANREVIEW_INSECURE_NO_AUTH") == "1"
 if INSECURE:
     log.warning("PLANREVIEW_INSECURE_NO_AUTH=1: API authentication is DISABLED. Local development only.")
 _secret_cache = {}
+MAX_BODY = int(os.environ.get("PLANREVIEW_MAX_BODY_BYTES", 1_000_000))
+LIMITERS = ratelimit.from_env()
+MAX_PAGE = 500
 
 
 def _secret():
@@ -73,6 +80,17 @@ async def request_context(request: Request, call_next):
     origin = request.headers.get("origin")
     if request.method not in {"GET", "HEAD", "OPTIONS"} and origin and origin not in ALLOWED_ORIGINS:
         return error_response(403, "ORIGIN_BLOCKED", "Cross-origin mutation blocked", request_id=rid(request))
+    if request.method not in {"GET", "HEAD", "OPTIONS"}:
+        declared = request.headers.get("content-length")
+        too_big = declared is not None and declared.isdigit() and int(declared) > MAX_BODY
+        if not too_big and declared is None:  # chunked upload: measure what actually arrives
+            too_big = len(await request.body()) > MAX_BODY
+        if too_big:
+            return error_response(413, "REQUEST_TOO_LARGE", f"Request body exceeds {MAX_BODY} bytes", request_id=rid(request))
+    if request.url.path != "/api/health":
+        ok, wait = LIMITERS["ip"].allow(request.client.host if request.client else "unknown")
+        if not ok:
+            return error_response(429, "RATE_LIMITED", "Too many requests from this address", request_id=rid(request), headers={"Retry-After": str(wait)})
     response = await call_next(request)
     response.headers["X-Request-ID"] = request.state.request_id
     response.headers["X-PlanReview-API"] = API_VERSION
@@ -90,6 +108,8 @@ async def on_domain_error(request: Request, exc: PlanReviewError):
 @app.exception_handler(authlib.AuthError)
 async def on_auth_error(request: Request, exc: authlib.AuthError):
     headers = {"WWW-Authenticate": "Bearer"} if exc.status == 401 else None
+    if exc.retry_after:
+        headers = {"Retry-After": str(exc.retry_after)}
     return error_response(exc.status, exc.code, exc.message, request_id=rid(request), headers=headers)
 
 
@@ -116,6 +136,11 @@ def call(fn, *args, lock=True):
     Translates low-level failures into stable API errors."""
     try:
         if lock and args:
+            active = pipeline.store.job_active(args[0])
+            if active:
+                raise StateConflictError(
+                    "A background job is running for this task; wait for it or cancel it", code="JOB_IN_PROGRESS", details={"job_id": active["id"]}
+                )
             with LOCKS.get(args[0]):
                 return fn(*args)
         return fn(*args)
@@ -137,12 +162,18 @@ def call(fn, *args, lock=True):
 def require(scope):
     def dep(request: Request):
         if INSECURE:
-            return {"scopes": {"read", "write", "evidence"}, "exp": None}
+            return {"sub": "insecure-local", "scopes": {"read", "write", "evidence"}, "exp": None, "jti": None}
         token = authlib.parse_bearer(request.headers.get("authorization"))
-        scopes, exp = authlib.verify(_secret(), token)
+        principal = authlib.verify(_secret(), token)
+        if pipeline.store.is_revoked(principal["jti"]):
+            raise authlib.AuthError("AUTH_REVOKED", "Credential has been revoked")
+        scopes = principal["scopes"]
         if scope not in scopes:
             raise authlib.AuthError("AUTH_SCOPE", f"This credential lacks the '{scope}' scope", status=403)
-        request.state.principal = {"scopes": scopes, "exp": exp}
+        request.state.principal = principal
+        ok, wait = LIMITERS["read" if request.method in {"GET", "HEAD"} else "write"].allow(principal["sub"] + ":" + request.method[:1])
+        if not ok:
+            raise authlib.AuthError("RATE_LIMITED", "Too many requests for this credential", status=429, retry_after=wait)
         return request.state.principal
 
     return dep
@@ -159,17 +190,42 @@ READ, WRITE, EVIDENCE = Depends(require("read")), Depends(require("write")), Dep
 @app.get("/api/health")
 def health():
     """Public: no task data. Reports the auth posture so clients can tell."""
-    return {"status": "ok", "evaluator": "cedar", "cloud_apply": False, "auth": "disabled" if INSECURE else "required", "api_version": API_VERSION}
+    return {"status": "ok", "evaluator": "cedar", "cloud_apply": False, "emulator_apply": gate_emulator() is not None and gate_emulator() is not False, "auth": "disabled" if INSECURE else "required", "api_version": API_VERSION}
 
 
 @app.get("/api/auth/whoami")
 def whoami(request: Request, principal=READ):
-    return {"scopes": sorted(principal["scopes"]), "expires_at": principal["exp"]}
+    return {"sub": principal["sub"], "scopes": sorted(principal["scopes"]), "expires_at": principal["exp"]}
+
+
+@app.post("/api/auth/revoke")
+def revoke_self(principal=READ):
+    """Revoke the presented credential (logout / suspected leak). Effective immediately."""
+    if principal["jti"]:
+        pipeline.store.revoke(principal["jti"], principal["sub"])
+    return {"revoked": True}
+
+
+@app.get("/api/capabilities")
+def capabilities(principal=READ):
+    """The deterministic registry of operations the backend will accept (anything else is UNSUPPORTED_OPERATION)."""
+    from engine.intent import CAPABILITY_REGISTRY
+
+    return {op: {k: v for k, v in e.items()} for op, e in CAPABILITY_REGISTRY.items()}
+
+
+def page(limit: int, offset: int):
+    if not 1 <= limit <= MAX_PAGE or offset < 0:
+        raise InvalidRequestError(f"limit must be 1..{MAX_PAGE} and offset >= 0", code="INVALID_PAGINATION")
+    return limit, offset
 
 
 @app.get("/api/tasks")
-def tasks(principal=READ):
-    return [task_view(t) for t in pipeline.store.list()]
+def tasks(response: Response, limit: int = 100, offset: int = 0, principal=READ):
+    """Newest first. The body stays a plain list; the total is in the `X-Total-Count` header."""
+    limit, offset = page(limit, offset)
+    response.headers["X-Total-Count"] = str(pipeline.store.count())
+    return [task_view(t) for t in pipeline.store.list(limit, offset)]
 
 
 _IDEM_KEY = re.compile(r"^[A-Za-z0-9_\-]{8,128}$")
@@ -197,6 +253,32 @@ def create(body: TaskInput, request: Request, principal=WRITE, idempotency_key: 
         return task_view(created)
 
 
+IdemHeader = Header(default=None, alias="Idempotency-Key")
+
+
+def idempotent(key, scope, payload, task_id, fn):
+    """Run `fn` at most once per (scope, Idempotency-Key). A retry with the same key and request returns the
+    ORIGINAL response (header `X-Idempotent-Replay: true`); the same key with a different request is 422.
+    Failed attempts are not recorded, so a retry after an error really retries."""
+    if key is None:
+        return fn()
+    if not _IDEM_KEY.match(key):
+        raise InvalidRequestError("Idempotency-Key must be 8-128 characters of A-Z a-z 0-9 _ -", code="INVALID_IDEMPOTENCY_KEY")
+    req_hash = hashlib.sha256(json.dumps(payload, sort_keys=True, default=str).encode()).hexdigest()
+    full = f"{scope}:{task_id}:{key}"
+    with LOCKS.get("idempotency:" + full):
+        prior = pipeline.store.idem_get(full)
+        if prior:
+            if prior["req_hash"] != req_hash:
+                raise InvalidRequestError("This Idempotency-Key was already used with a different request", code="IDEMPOTENCY_KEY_REUSED")
+            resp = JSONResponse(json.loads(prior["response"]))
+            resp.headers["X-Idempotent-Replay"] = "true"
+            return resp
+        out = fn()
+        pipeline.store.idem_put(full, req_hash, task_id, json.dumps(out, default=str))
+        return out
+
+
 @app.get("/api/tasks/{id}")
 def get(id: str, principal=READ):
     return task_view(call(pipeline.store.get, id, lock=False))
@@ -208,44 +290,109 @@ def intent(id: str, principal=READ):
 
 
 @app.post("/api/tasks/{id}/confirm")
-def confirm(id: str, body: dict | None = None, principal=WRITE):
-    return task_view(call(pipeline.confirm, id, body))
+def confirm(id: str, body: dict | None = None, principal=WRITE, idempotency_key: str | None = IdemHeader):
+    return idempotent(idempotency_key, "confirm", body, id, lambda: task_view(call(pipeline.confirm, id, body)))
 
 
 @app.post("/api/tasks/{id}/agent")
-def agent(id: str, variant: str = "poisoned", principal=WRITE):
-    return task_view(call(pipeline.agent, id, variant))
+def agent(id: str, variant: str = "poisoned", principal=WRITE, idempotency_key: str | None = IdemHeader):
+    return idempotent(idempotency_key, "agent", {"variant": variant}, id, lambda: task_view(call(pipeline.agent, id, variant)))
 
 
 @app.post("/api/tasks/{id}/plan")
-def plan(id: str, principal=WRITE):
-    return task_view(call(pipeline.plan, id))
+def plan(id: str, principal=WRITE, idempotency_key: str | None = IdemHeader):
+    return idempotent(idempotency_key, "plan", {}, id, lambda: task_view(call(pipeline.plan, id)))
 
 
 @app.post("/api/tasks/{id}/canonicalize")
-def canonical(id: str, principal=WRITE):
-    return task_view(call(pipeline.canonicalize, id))
+def canonical(id: str, principal=WRITE, idempotency_key: str | None = IdemHeader):
+    return idempotent(idempotency_key, "canonicalize", {}, id, lambda: task_view(call(pipeline.canonicalize, id)))
 
 
 @app.post("/api/tasks/{id}/evaluate")
-def evaluate(id: str, principal=WRITE):
-    return task_view(call(pipeline.evaluate, id))
+def evaluate(id: str, principal=WRITE, idempotency_key: str | None = IdemHeader):
+    return idempotent(idempotency_key, "evaluate", {}, id, lambda: task_view(call(pipeline.evaluate, id)))
 
 
 @app.post("/api/tasks/{id}/resolve")
-def resolve(id: str, body: dict[str, str], principal=WRITE):
-    return task_view(call(pipeline.resolve, id, body))
+def resolve(id: str, body: dict[str, str], principal=WRITE, idempotency_key: str | None = IdemHeader):
+    return idempotent(idempotency_key, "resolve", body, id, lambda: task_view(call(pipeline.resolve, id, body, principal["sub"])))
 
 
 @app.post("/api/tasks/{id}/apply")
-def apply(id: str, principal=WRITE):
-    return task_view(call(pipeline.apply, id))
+def apply(id: str, principal=WRITE, idempotency_key: str | None = IdemHeader):
+    return idempotent(idempotency_key, "apply", {}, id, lambda: task_view(call(pipeline.apply, id, principal["sub"])))
+
+
+class JobInput(BaseModel):
+    op: str
+    variant: str | None = None
+
+
+_runner_state = {}
+
+
+def _runner():
+    r = _runner_state.get("r")
+    if r is None or r.pipeline is not pipeline:
+        if r:
+            r.stop()
+        r = JobRunner(pipeline)
+        r.start()
+        _runner_state["r"] = r
+    return r
+
+
+def _start_jobs():
+    _runner()
+
+
+app.router.on_startup.append(_start_jobs)
+
+
+def job_view(j):
+    return {
+        "id": j["id"], "task_id": j["task_id"], "op": j["op"], "args": j["args"], "status": j["status"],
+        "progress": j["progress"], "requested_by": j["actor"], "created_at": j["created_at"], "started_at": j["started_at"],
+        "finished_at": j["finished_at"], "cancel_requested": j["cancel_requested"], "result": j["result"],
+        "error": {"code": j["error_code"], "message": j["error_message"]} if j["error_code"] else None,
+    }
+
+
+@app.post("/api/tasks/{id}/jobs", status_code=202)
+def submit_job(id: str, body: JobInput, principal=WRITE, idempotency_key: str | None = IdemHeader):
+    """Run a long operation (agent | plan | apply) in the background. Returns 202 immediately; poll
+    `GET /api/jobs/{job_id}`. One active job per task; survives client disconnects and restarts."""
+    args = {"variant": body.variant} if body.op == "agent" and body.variant else {}
+    return idempotent(idempotency_key, "job", {"op": body.op, "args": args}, id, lambda: job_view(call(_runner().submit, id, body.op, args, principal["sub"], lock=False)))
+
+
+@app.get("/api/tasks/{id}/jobs")
+def task_jobs(id: str, principal=READ):
+    call(pipeline.store.get, id, lock=False)
+    return [job_view(j) for j in pipeline.store.jobs_for_task(id)]
+
+
+@app.get("/api/jobs/{job_id}")
+def get_job(job_id: str, principal=READ):
+    j = pipeline.store.job_get(job_id)
+    if j is None:
+        raise NotFoundError("Job not found", code="JOB_NOT_FOUND")
+    return job_view(j)
+
+
+@app.post("/api/jobs/{job_id}/cancel")
+def cancel_job(job_id: str, principal=WRITE):
+    """Queued jobs cancel at once; a running job's Terraform process tree is killed within ~1 second."""
+    return job_view(_runner().cancel(job_id))
 
 
 @app.get("/api/tasks/{id}/audit")
-def audit(id: str, principal=READ):
+def audit(id: str, response: Response, limit: int = 200, offset: int = 0, principal=READ):
     call(pipeline.store.get, id, lock=False)  # 404 for an unknown task
-    return audit_view(pipeline.store.audit(id))
+    limit, offset = page(limit, offset)
+    response.headers["X-Total-Count"] = str(pipeline.store.audit_count(id))
+    return audit_view(pipeline.store.audit(id, limit, offset))
 
 
 @app.get("/api/tasks/{id}/evidence/{event_id}")

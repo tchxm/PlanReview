@@ -46,7 +46,7 @@ def test_chaos_01_direct_api_apply_with_deny_blocks_and_never_spawns(tmp_path, m
     verdicts = task_data["runs"][-1]["verdicts"]
     assert any(v["verdict"] == "DENY" for v in verdicts)
 
-    with patch("engine.gate.subprocess.run") as mock_spawn:
+    with patch("engine.gate.run_tree") as mock_spawn:
         resp = client.post(f"/api/tasks/{task_id}/apply")
         mock_spawn.assert_not_called()
 
@@ -73,7 +73,7 @@ def test_chaos_02_missing_or_corrupted_canonical_plan_blocks(tmp_path):
     run_no_canonical["canonical"] = None
 
     c = Contract.model_validate(task_data["contract"])
-    with patch("engine.gate.subprocess.run") as mock_spawn:
+    with patch("engine.gate.run_tree") as mock_spawn:
         res = apply_saved(c, run_no_canonical, {})
         mock_spawn.assert_not_called()
 
@@ -91,7 +91,7 @@ def test_chaos_03_unresolved_and_rejected_review_blocks_apply(tmp_path):
     p.evaluate(task_id)
 
     # 1. Apply without any resolution
-    with patch("engine.gate.subprocess.run") as mock_spawn:
+    with patch("engine.gate.run_tree") as mock_spawn:
         t = p.apply(task_id)
         mock_spawn.assert_not_called()
 
@@ -101,7 +101,7 @@ def test_chaos_03_unresolved_and_rejected_review_blocks_apply(tmp_path):
 
     # 2. Resolve to 'reject'
     p.resolve(task_id, {"aws_security_group.api": "reject"})
-    with patch("engine.gate.subprocess.run") as mock_spawn:
+    with patch("engine.gate.run_tree") as mock_spawn:
         t2 = p.apply(task_id)
         mock_spawn.assert_not_called()
 
@@ -129,7 +129,7 @@ def test_chaos_04_expired_contract_blocks_apply(tmp_path):
     with sqlite3.connect(p.store.path) as db:
         db.execute("UPDATE tasks SET body=? WHERE id=?", (json.dumps(task_data), task_id))
 
-    with patch("engine.gate.subprocess.run") as mock_spawn:
+    with patch("engine.gate.run_tree") as mock_spawn:
         t = p.apply(task_id)
         mock_spawn.assert_not_called()
 
@@ -153,7 +153,7 @@ def test_chaos_05_modified_saved_plan_blocks_apply(tmp_path):
     # Tamper with saved binary plan
     plan_file.write_bytes(b"tampered binary plan contents")
 
-    with patch("engine.gate.subprocess.run") as mock_spawn:
+    with patch("engine.gate.run_tree") as mock_spawn:
         t = p.apply(task_id)
         mock_spawn.assert_not_called()
 
@@ -177,7 +177,7 @@ def test_chaos_06_modified_confirmed_contract_raises_integrity_error(tmp_path):
         data["contract"]["allowed_resource_addresses"] = ["aws_lambda_function.evil"]
         db.execute("UPDATE tasks SET body=? WHERE id=?", (json.dumps(data), task_id))
 
-    with patch("engine.gate.subprocess.run") as mock_spawn:
+    with patch("engine.gate.run_tree") as mock_spawn:
         with pytest.raises(ValueError, match="Confirmed contract integrity hash mismatch"):
             p.apply(task_id)
         mock_spawn.assert_not_called()
@@ -203,7 +203,7 @@ def test_chaos_07_reused_review_approval_cleared_on_new_plan(tmp_path):
     task_data = p.store.get(task_id)
     assert task_data["runs"][-1]["resolutions"] == {}
 
-    with patch("engine.gate.subprocess.run") as mock_spawn:
+    with patch("engine.gate.run_tree") as mock_spawn:
         t = p.apply(task_id)
         mock_spawn.assert_not_called()
 
@@ -257,6 +257,8 @@ def test_chaos_09_repeated_apply_rejected(tmp_path):
 def test_chaos_10_ollama_failure_preserves_safe_workspace(tmp_path, monkeypatch):
     """Scenario 10: Ollama failure during edit raises an error without corrupting workspace."""
     p = Pipeline(tmp_path)
+    # The scenario is about a failure DURING the edit, so intent extraction must not depend on a live Ollama.
+    monkeypatch.setattr("engine.agent.ollama_configuration", lambda: {"server_reachable": True, "model_installed": True})
     t = p.create("Task for ollama test", mode="ollama")
     p.confirm(t["id"], t["contract"])
 
@@ -273,3 +275,16 @@ def test_chaos_10_ollama_failure_preserves_safe_workspace(tmp_path, monkeypatch)
     assert task_state.get("stage") != "edited"
     assert not task_state.get("prepared", False)
 
+
+
+def test_resolution_records_who_approved(tmp_path):
+    p, task_id = create_confirmed_pipeline_task(tmp_path)
+    p.agent(task_id, "review")
+    p.plan(task_id)
+    p.canonicalize(task_id)
+    p.evaluate(task_id)
+    t = p.resolve(task_id, {"aws_security_group.api": "reject"}, "alice")
+    actor = t["runs"][-1]["resolution_actors"]["aws_security_group.api"]
+    assert actor["by"] == "alice" and actor["at"]
+    ev = [e for e in p.store.audit(task_id) if e["kind"] == "human_resolution"][-1]
+    assert ev["data"]["by"] == "alice"

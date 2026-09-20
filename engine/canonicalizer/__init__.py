@@ -71,6 +71,19 @@ def diff(before, after, unknown, sensitive_before, sensitive_after, path=""):
     return []
 
 
+def references(node):
+    """All `references` in an expressions tree; nested blocks (environment, versioning...) are lists of dicts."""
+    if isinstance(node, dict):
+        for k, v in node.items():
+            if k == "references" and isinstance(v, list):
+                yield from (r for r in v if isinstance(r, str))
+            else:
+                yield from references(v)
+    elif isinstance(node, list):
+        for v in node:
+            yield from references(v)
+
+
 def canonicalize(plan: dict) -> list[CanonicalChange]:
     malformed = lambda address: CanonicalChange(
         address=address,
@@ -145,13 +158,7 @@ def canonicalize(plan: dict) -> list[CanonicalChange]:
             sb = c.get("before_sensitive", {})
             sa = c.get("after_sensitive", {})
             changes = diff(before, after, unknown, sb, sa)
-            deps = sorted(
-                {
-                    ref
-                    for ex in config.get("expressions", {}).values()
-                    for ref in ex.get("references", [])
-                }
-            )
+            deps = sorted(set(references(config.get("expressions", {}))))
             result.append(
                 CanonicalChange(
                     address=address,
