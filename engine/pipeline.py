@@ -210,6 +210,9 @@ class Pipeline:
 
         env = os.environ.copy()
         env["TF_PLUGIN_CACHE_DIR"] = os.environ.get("PLANREVIEW_PLUGIN_CACHE") or str(ROOT / ".provider-cache")
+        if os.environ.get("RENDER"):  # 512MB instance: keep the Go runtime (AWS provider) inside it
+            env.setdefault("GOMEMLIMIT", "300MiB")
+            env.setdefault("GOGC", "50")
         report(f"terraform {args[0]}")
         try:
             p = run_tree(
@@ -257,19 +260,39 @@ class Pipeline:
             self.command(["init", "-input=false", "-no-color"], path)
         rid = str(uuid.uuid4())
         plan_path = path / f"{rid}.tfplan"
-        log = self.command(
-            [
-                "plan",
-                "-refresh=false",
-                "-input=false",
-                "-no-color",
-                f"-out={plan_path}",
-            ],
-            path,
-        )
-        raw = self.command(["show", "-json", str(plan_path)], path)
         raw_path = path / f"{rid}.json"
-        raw_path.write_text(raw)
+        # A plan is a pure function of (config, seed state). Hosted builds pre-compute it once with the real
+        # Terraform (tools/warm_plans.py) because loading the AWS provider does not fit a small instance.
+        key = hashlib.sha256(b"|".join((path / n).read_bytes() for n in ("main.tf", "terraform.tfstate", "lambda.zip"))).hexdigest()
+        cached = ROOT / ".plan-cache" / key
+        if (cached / "plan.tfplan").exists() and (cached / "plan.json").exists():
+            shutil.copy2(cached / "plan.tfplan", plan_path)
+            raw = (cached / "plan.json").read_text(encoding="utf-8")
+            raw_path.write_text(raw)
+            log = "Plan produced by a real `terraform plan` run at build time for this exact configuration and state. " + (
+                (cached / "plan.log").read_text(encoding="utf-8") if (cached / "plan.log").exists() else ""
+            )
+        else:
+            log = self.command(
+                [
+                    "plan",
+                    "-refresh=false",
+                    "-input=false",
+                    "-no-color",
+                    "-parallelism=1",
+                    f"-out={plan_path}",
+                ],
+                path,
+            )
+            raw = self.command(["show", "-json", str(plan_path)], path)
+            raw_path.write_text(raw)
+            try:
+                cached.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(plan_path, cached / "plan.tfplan")
+                (cached / "plan.json").write_text(raw, encoding="utf-8")
+                (cached / "plan.log").write_text(log, encoding="utf-8")
+            except OSError:
+                pass
         plan_hash, raw_hash = digest(plan_path), digest(raw_path)
         self.vault.seal(plan_path)  # plaintext plan artifacts never rest on disk (see engine/vault.py)
         self.vault.seal(raw_path)

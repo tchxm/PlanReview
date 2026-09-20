@@ -22,4 +22,5 @@ design/planbound/upgrade_site.py
 # the seed state the pipeline copies into each new workspace (dummy account 123456789012, no secrets)
 !terraform/fixtures/baseline/terraform.tfstate
 .tf-template/
+.plan-cache/
 bin/

@@ -4,7 +4,7 @@ services:
     runtime: python
     plan: free
     # Installs the Terraform CLI and warms the AWS provider cache so the real pipeline works on the hosted URL.
-    buildCommand: pip install -r requirements.txt && python tools/install_terraform.py
+    buildCommand: pip install -r requirements.txt && python tools/install_terraform.py && python tools/warm_plans.py
     # run_site.py = site + API + real pipeline + loopback AWS emulator (seeded with the baseline), one process.
     startCommand: python run_site.py
     healthCheckPath: /api/health
