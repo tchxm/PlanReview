@@ -22,6 +22,9 @@ if "OneDrive" in str(ROOT):
         print("Copying the Terraform provider cache out of OneDrive (once)...")
         shutil.copytree(ROOT / ".provider-cache", cache)
 
+if os.environ.get("RENDER"):  # 512MB instance: keep every Terraform/AWS-provider process inside it
+    os.environ.setdefault("GOMEMLIMIT", "300MiB")
+    os.environ.setdefault("GOGC", "50")
 os.environ.setdefault("PLANREVIEW_TF_TIMEOUT", "900")  # first Terraform runs on Windows can be slow
 if (ROOT / "bin").exists():  # hosted builds put the Terraform CLI here (tools/install_terraform.py)
     os.environ["PATH"] = str(ROOT / "bin") + os.pathsep + os.environ["PATH"]
