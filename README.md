@@ -1,6 +1,6 @@
 <div align="center">
 
-#PlanReview
+# PlanReview
 
 ### A checkpoint between an AI agent and your infrastructure.
 
