@@ -11,6 +11,8 @@ from pydantic import BaseModel
 
 from engine.exceptions import (
     AmbiguousRequestError,
+    InvalidRequestError,
+    ModelResponseInvalidError,
     ModelUnavailableError,
     UnsupportedOperationError,
 )
@@ -71,6 +73,7 @@ class IntentProposal(BaseModel):
     raw_task: str
     status: Literal["VALIDATED", "UNSUPPORTED", "AMBIGUOUS"] = "VALIDATED"
     reason: str = ""
+    mapped_from: str | None = None
 
 
 def validate_capability(proposal: IntentProposal) -> tuple[bool, str, str | None]:
@@ -142,7 +145,7 @@ def extract_deterministic_intent(task: str) -> IntentProposal:
     """Rule-based extractor supporting multiple phrasings, numbers, and tag changes."""
     lower = task.lower().strip()
     if not lower:
-        raise ValueError("Task is required")
+        raise InvalidRequestError("Task is required", code="TASK_REQUIRED")
 
     # Replay backwards compatibility: test phrases targeted at rule-based draft
     if lower in ["demo task", "demo scope", "scope", "increase memory", "demo"] or lower.startswith("scope"):
@@ -253,15 +256,41 @@ def extract_deterministic_intent(task: str) -> IntentProposal:
     )
 
 
+# Deterministic allowlist: informal names a model may produce -> the ONE canonical address.
+# Normalisation removes case and punctuation. A name is mapped only if it is listed here for the
+# stated operation; anything else (including anything ambiguous) is left as-is and rejected by
+# validate_capability. Nothing here ever widens the supported scope.
+_NAME_ALLOWLIST = {
+    "update_memory": {
+        "aws_lambda_function.dev_api": ("awslambdafunctiondevapi", "devapilambda", "devapi", "devapilambdafunction", "lambdadevapi", "lambdafunctiondevapi", "devapifunction"),
+    },
+    "update_tags": {
+        "aws_s3_bucket.assets": ("awss3bucketassets", "assetsbucket", "assets", "devassetsbucket", "devassets", "assetss3bucket", "s3assets", "planreviewdemoassets"),
+    },
+}
+
+
+def _norm(name):
+    return re.sub(r"[^a-z0-9]", "", str(name).lower())
+
+
+def canonical_address(name, operation):
+    """Return the canonical address for a known informal name under `operation`, else None."""
+    key = _norm(name)
+    hits = {addr for addr, names in _NAME_ALLOWLIST.get(operation, {}).items() if key in names}
+    # exact canonical addresses pass through untouched; ambiguity (never with this table) would yield None
+    return hits.pop() if len(hits) == 1 else None
+
+
 def extract_llm_intent(task: str) -> IntentProposal:
     """Extract structured intent using local Ollama model with strict schema validation."""
-    from engine.agent import ollama_configuration, OLLAMA_HOST, OLLAMA_MODEL
+    from engine.agent import ollama_configuration, ollama_host, ollama_model_name, ollama_chat_timeout
     from ollama import Client
 
     config = ollama_configuration()
     if not config.get("server_reachable") or not config.get("model_installed"):
         raise ModelUnavailableError(
-            f"Local Ollama model {OLLAMA_MODEL!r} is unavailable: {config.get('error', 'server unreachable or model not installed')}. "
+            f"Local Ollama model {ollama_model_name()!r} is unavailable. "
             "Please ensure Ollama is running and the model is pulled.",
             details=config,
         )
@@ -315,9 +344,9 @@ def extract_llm_intent(task: str) -> IntentProposal:
     )
 
     try:
-        client = Client(host=OLLAMA_HOST, timeout=30)
+        client = Client(host=ollama_host(), timeout=ollama_chat_timeout())
         response = client.chat(
-            model=OLLAMA_MODEL,
+            model=ollama_model_name(),
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": task},
@@ -330,13 +359,21 @@ def extract_llm_intent(task: str) -> IntentProposal:
             if match:
                 content = match.group(1)
         data = json.loads(content)
+    except ModelUnavailableError:
+        raise
+    except (ConnectionError, TimeoutError, OSError) as exc:
+        raise ModelUnavailableError("The local model did not answer in time or the connection failed", details={"reason": type(exc).__name__})
+    except json.JSONDecodeError:
+        raise ModelResponseInvalidError("The local model returned a response that is not valid JSON", details={"raw_output_excerpt": str(locals().get("content", ""))[:200]})
     except Exception as exc:
-        if isinstance(exc, ModelUnavailableError):
-            raise
-        raise AmbiguousRequestError(
-            f"Failed to parse model intent output: {exc}",
-            details={"task": task, "raw_output": locals().get("content", "")},
-        )
+        # httpx/ollama transport errors (connect, read timeout) and malformed envelopes land here
+        name = type(exc).__name__
+        if any(k in name for k in ("Connect", "Timeout", "ResponseError", "Network", "Protocol")):
+            raise ModelUnavailableError("The local model did not answer in time or the connection failed", details={"reason": name})
+        raise ModelResponseInvalidError("The local model returned an unusable response", details={"reason": name})
+
+    if not isinstance(data, dict):
+        raise ModelResponseInvalidError("The local model returned JSON that is not an object", details={"raw_output_excerpt": str(data)[:200]})
 
     op = data.get("operation", "unsupported")
     if op == "unsupported":
@@ -345,9 +382,12 @@ def extract_llm_intent(task: str) -> IntentProposal:
             details={"task": task, "model_response": data},
         )
 
+    raw_address = data.get("resource_address", "")
+    mapped = canonical_address(raw_address, op)
     proposal = IntentProposal(
         operation=op,
-        resource_address=data.get("resource_address", ""),
+        resource_address=mapped or raw_address,
+        mapped_from=raw_address if mapped and mapped != raw_address else None,
         resource_type=data.get("resource_type", ""),
         attribute=data.get("attribute", ""),
         requested_value=data.get("requested_value"),
@@ -368,6 +408,6 @@ def interpret(task: str, mode: str = "replay") -> IntentProposal:
         raise UnsupportedOperationError(reason, details={"proposal": proposal.model_dump()})
 
     proposal.status = "VALIDATED"
-    proposal.reason = reason
+    proposal.reason = reason + (f" (model name {proposal.mapped_from!r} mapped to its canonical address by the allowlist)" if proposal.mapped_from else "")
     return proposal
 

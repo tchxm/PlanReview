@@ -1,12 +1,49 @@
 """Local Strands integrations. Terraform tools are limited to an isolated task fixture."""
 
 from pathlib import Path
+from engine.exceptions import InvalidRequestError, ModelUnavailableError
 import re
 import threading
 from typing import Any
 
+import os
+from urllib.parse import urlparse
+
+# Defaults; override with PLANREVIEW_OLLAMA_HOST / _MODEL / _TIMEOUT / _CHAT_TIMEOUT.
 OLLAMA_HOST = "http://localhost:11434"
 OLLAMA_MODEL = "llama3.2:3b"
+_LOOPBACK = {"localhost", "127.0.0.1", "::1"}
+
+
+def _float_env(name, default):
+    try:
+        return max(0.1, float(os.environ.get(name, default)))
+    except ValueError:
+        return float(default)
+
+
+def ollama_host():
+    """Configured Ollama endpoint. Non-loopback hosts are refused unless explicitly allowed,
+    so prompts (which contain infrastructure requests) never leave the machine by accident."""
+    host = os.environ.get("PLANREVIEW_OLLAMA_HOST", OLLAMA_HOST)
+    parsed = urlparse(host)
+    if parsed.scheme not in ("http", "https") or not parsed.hostname:
+        raise ModelUnavailableError("PLANREVIEW_OLLAMA_HOST is not a valid http(s) URL", details={"reason": "invalid_host"})
+    if parsed.hostname not in _LOOPBACK and os.environ.get("PLANREVIEW_OLLAMA_ALLOW_REMOTE") != "1":
+        raise ModelUnavailableError("The configured Ollama host is not loopback; set PLANREVIEW_OLLAMA_ALLOW_REMOTE=1 to allow it", details={"reason": "remote_host_refused"})
+    return host
+
+
+def ollama_model_name():
+    return os.environ.get("PLANREVIEW_OLLAMA_MODEL", OLLAMA_MODEL)
+
+
+def ollama_list_timeout():
+    return _float_env("PLANREVIEW_OLLAMA_TIMEOUT", 10)
+
+
+def ollama_chat_timeout():
+    return _float_env("PLANREVIEW_OLLAMA_CHAT_TIMEOUT", 30)
 EDIT_LOCK = threading.RLock()
 
 
@@ -24,12 +61,17 @@ def ollama_configuration():
     """Report local-server availability without any cloud fallback."""
     from ollama import Client
     try:
-        response = Client(host=OLLAMA_HOST, timeout=10).list()
+        host, wanted = ollama_host(), ollama_model_name()
+    except ModelUnavailableError as exc:
+        return {"enabled": True, "server_reachable": False, "model_installed": False, "error": exc.message, "reason": exc.details.get("reason")}
+    try:
+        response = Client(host=host, timeout=ollama_list_timeout()).list()
         models = response.models if hasattr(response, "models") else response.get("models", [])
         names = [model.model if hasattr(model, "model") else model.get("model", "") for model in models]
-        return {"enabled": True, "server_reachable": True, "model_installed": OLLAMA_MODEL in names}
+        return {"enabled": True, "server_reachable": True, "model_installed": wanted in names}
     except Exception as exc:
-        return {"enabled": True, "server_reachable": False, "model_installed": False, "error": str(exc)}
+        # connection refused, timeout, malformed body: all mean "not usable"; never a fallback
+        return {"enabled": True, "server_reachable": False, "model_installed": False, "error": type(exc).__name__, "reason": "unreachable_or_invalid_response"}
 
 
 def ollama_model():
@@ -37,8 +79,8 @@ def ollama_model():
     from strands.models.ollama import OllamaModel
     status = ollama_configuration()
     if not status["server_reachable"] or not status["model_installed"]:
-        raise ValueError(f"Local Ollama model {OLLAMA_MODEL!r} is unavailable: {status}")
-    return OllamaModel(host=OLLAMA_HOST, model_id=OLLAMA_MODEL, temperature=0, max_tokens=1024,
+        raise ModelUnavailableError(f"Local Ollama model {ollama_model_name()!r} is unavailable", details={"server_reachable": status.get("server_reachable"), "model_installed": status.get("model_installed")})
+    return OllamaModel(host=ollama_host(), model_id=ollama_model_name(), temperature=0, max_tokens=1024,
                        options={"num_ctx": 4096}, ollama_client_args={"timeout": 180})
 
 
@@ -72,15 +114,15 @@ def live_edit(task: str, workspace: Path, intent: Any = None, adversarial: bool 
     def set_dev_api_memory(memory_size: int) -> str:
         """Set only aws_lambda_function.dev_api memory_size to the confirmed value."""
         if memory_size != target_mem:
-            raise ValueError(f"The confirmed contract permits only memory_size={target_mem}, got {memory_size}")
+            raise InvalidRequestError(f"The confirmed contract permits only memory_size={target_mem}, got {memory_size}", code="AGENT_EDIT_REJECTED")
         if not (128 <= memory_size <= 10240):
-            raise ValueError(f"Invalid memory_size {memory_size}: must be 128-10240 MB")
+            raise InvalidRequestError(f"Invalid memory_size {memory_size}: must be 128-10240 MB", code="AGENT_EDIT_REJECTED")
         with EDIT_LOCK:
             path = workspace / "main.tf"
             original = path.read_text(encoding="utf-8")
             expected = "memory_size = 512"
             if original.count(expected) != 1:
-                raise ValueError("Expected exactly one baseline Lambda memory declaration")
+                raise InvalidRequestError("Expected exactly one baseline Lambda memory declaration", code="AGENT_EDIT_REJECTED")
             path.write_text(original.replace(expected, f"memory_size = {memory_size}"), encoding="utf-8")
         return f"Updated only aws_lambda_function.dev_api memory_size to {memory_size}. No commands executed."
 
@@ -88,16 +130,16 @@ def live_edit(task: str, workspace: Path, intent: Any = None, adversarial: bool 
     def set_assets_team_tag(team: str) -> str:
         """Set only the Team tag on aws_s3_bucket.assets to the confirmed value."""
         if team != target_team:
-            raise ValueError(f"The confirmed contract permits only Team={target_team!r}, got {team!r}")
+            raise InvalidRequestError(f"The confirmed contract permits only Team={target_team!r}, got {team!r}", code="AGENT_EDIT_REJECTED")
         if not re.match(r"^[a-zA-Z0-9_-]{1,32}$", team):
-            raise ValueError(f"Invalid team tag {team!r}")
+            raise InvalidRequestError(f"Invalid team tag {team!r}", code="AGENT_EDIT_REJECTED")
         with EDIT_LOCK:
             path = workspace / "main.tf"
             original = path.read_text(encoding="utf-8")
             expected = 'resource "aws_s3_bucket" "assets" {\n  bucket = "planreview-demo-assets"\n  tags = { Environment = "dev" }\n}'
             replacement = f'resource "aws_s3_bucket" "assets" {{\n  bucket = "planreview-demo-assets"\n  tags = {{ Environment = "dev", Team = "{team}" }}\n}}'
             if original.count(expected) != 1:
-                raise ValueError("Expected exactly one baseline dev assets bucket declaration")
+                raise InvalidRequestError("Expected exactly one baseline dev assets bucket declaration", code="AGENT_EDIT_REJECTED")
             path.write_text(original.replace(expected, replacement), encoding="utf-8")
         return f"Updated only aws_s3_bucket.assets Team tag to {team}. No commands executed."
 
@@ -110,7 +152,7 @@ def live_edit(task: str, workspace: Path, intent: Any = None, adversarial: bool 
             expected = 'resource "aws_s3_bucket" "assets" {\n  bucket = "planreview-demo-assets"\n  tags = { Environment = "dev" }\n}'
             replacement = 'resource "aws_s3_bucket" "assets" {\n  bucket = "planreview-demo-assets"\n  tags = { Environment = "dev", AgentDemo = "unanticipated-change" }\n}'
             if original.count(expected) != 1:
-                raise ValueError("Expected exactly one baseline dev assets bucket declaration")
+                raise InvalidRequestError("Expected exactly one baseline dev assets bucket declaration", code="AGENT_EDIT_REJECTED")
             path.write_text(original.replace(expected, replacement), encoding="utf-8")
         return "Added the harmless AgentDemo tag only to the dev assets bucket. No commands executed."
 
@@ -125,7 +167,7 @@ def live_edit(task: str, workspace: Path, intent: Any = None, adversarial: bool 
                 pattern = rf"(?m)^(  {name} = )true$"
                 changed, count = re.subn(pattern, r"\1false", changed)
                 if count != 1:
-                    raise ValueError(f"Expected exactly one baseline {name} declaration")
+                    raise InvalidRequestError(f"Expected exactly one baseline {name} declaration", code="AGENT_EDIT_REJECTED")
             path.write_text(changed, encoding="utf-8")
         return "Weakened the four dev assets public-access controls for the explicit Cedar DENY demo. No commands executed."
 
