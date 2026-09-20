@@ -1,0 +1,31 @@
+# Backend verification matrix. NOT yet executed on GitHub by the author: Windows was verified
+# locally; Linux and macOS are UNVERIFIED until this workflow runs (see docs/backend-hardening-status.md).
+name: backend
+on:
+  workflow_dispatch:
+  pull_request:
+    paths: ["engine/**", "tests/**", "cedar/**", "terraform/**", "requirements.txt", ".github/workflows/backend.yml"]
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_wrapper: false
+      - run: python -m pip install -r requirements.txt
+      - name: Generate Terraform fixtures (real plans, dummy credentials, no AWS calls)
+        run: python terraform/scripts/generate.py
+      - name: Backend suite
+        run: python -m pytest -q
+      - name: Bounded load test
+        run: python tools/load_test.py
