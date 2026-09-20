@@ -12,6 +12,9 @@ ROOT = Path(__file__).resolve().parents[1]
 
 def seed(emu, plugin_cache=None, timeout=900):
     env = {**os.environ, **emu.env(), "TF_PLUGIN_CACHE_DIR": str(plugin_cache or os.environ.get("PLANREVIEW_PLUGIN_CACHE") or ROOT / ".provider-cache")}
+    if os.environ.get("RENDER"):
+        env.setdefault("GOMEMLIMIT", "300MiB")
+        env.setdefault("GOGC", "50")
     Path(env["TF_PLUGIN_CACHE_DIR"]).mkdir(parents=True, exist_ok=True)
     base = Path(tempfile.mkdtemp(prefix="planbound-baseline-"))
     for n in ["lambda.zip", ".terraform.lock.hcl", "main.tf"]:

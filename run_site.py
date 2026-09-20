@@ -33,10 +33,21 @@ if os.environ.get("PLANBOUND_EMULATOR") != "0":
         os.environ.update(emu.env())
         print("Local AWS emulator on", emu.endpoint, "(loopback, dummy credentials)")
         if shutil.which("terraform"):
-            from tools.seed_emulator import seed
+            import threading
+            import time
 
-            print("Seeding the emulator with the baseline infrastructure (dev-api Lambda, assets bucket, security group)...")
-            seed(emu)
+            def seed_later():  # AFTER the web server is listening: a cold Terraform run must not block the port or the health check
+                time.sleep(3)
+                try:
+                    from tools.seed_emulator import seed
+
+                    print("Seeding the emulator with the baseline infrastructure (dev-api Lambda, assets bucket, security group)...")
+                    seed(emu)
+                    print("Emulator seeded.")
+                except Exception as e:
+                    print("Emulator seeding failed:", e)
+
+            threading.Thread(target=seed_later, daemon=True, name="seed-emulator").start()
     except Exception as e:  # moto missing etc.: the site still works, apply reports BLOCKED
         print("Emulator not started:", e)
 

@@ -1130,7 +1130,7 @@ PB.pipePanel=ctx=>{
    if(st.stage===5){st.task=await P().step(st.task.id,'evaluate');st.stage=7}
    st.task=await P().get(st.task.id);st.note='';busy=false;paint();PB.a11y.announce('Cedar evaluation finished. '+st.task.runs[st.task.runs.length-1].verdicts.length+' changes have verdicts.')}catch(e){st.failed=st.stage;busy=false;if(!e.network)st.stage=at;fail(e,()=>{st.failed=null;run_()})}}
  async function resolve(addr,choice){try{st.task=await P().resolve(st.task.id,{[addr]:choice});st.stage=7;paint();PB.a11y.announce((choice==='approve'?'Approved ':'Rejected ')+addr)}catch(e){fail(e,()=>resolve(addr,choice))}}
- async function apply(){if(busy)return;busy=true;try{await job('apply',null,'Asking the server to apply…');st.task=await P().get(st.task.id);st.note='';busy=false;paint()}catch(e){busy=false;try{st.task=await P().get(st.task.id)}catch(x){}fail(e,apply)}}
+ async function apply(){if(busy)return;busy=true;try{await job('apply',null,'Asking the server to apply…');st.task=await P().get(st.task.id);st.note='';try{st.audit=await P().audit(st.task.id);st.verify=await P().verify()}catch(e2){}busy=false;paint();PB.a11y.announce('Apply gate result and audit trail are shown below.')}catch(e){busy=false;try{st.task=await P().get(st.task.id)}catch(x){}fail(e,apply)}}
  async function audit(){try{st.audit=await P().audit(st.task.id);paint()}catch(e){fail(e,audit)}}
  async function verify(){try{st.verify=await P().verify();paint();PB.a11y.announce(st.verify.ok?'Audit chain verified.':'Audit chain problem found.')}catch(e){fail(e,verify)}}
  ctx.clean.push(PB.api.subscribe(paint));paint();return root};
