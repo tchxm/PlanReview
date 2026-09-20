@@ -34,8 +34,10 @@ log = logging.getLogger("planreview")
 
 API_VERSION = "2"
 app = FastAPI(title="PlanReview", version="0.2.0")
+# A hosted deployment names its public host (Render sets RENDER_EXTERNAL_HOSTNAME itself).
+PUBLIC_HOST = os.environ.get("PLANREVIEW_PUBLIC_HOST") or os.environ.get("RENDER_EXTERNAL_HOSTNAME") or ""
 app.add_middleware(
-    TrustedHostMiddleware, allowed_hosts=["localhost", "127.0.0.1", "testserver"]
+    TrustedHostMiddleware, allowed_hosts=["localhost", "127.0.0.1", "testserver"] + ([PUBLIC_HOST] if PUBLIC_HOST else [])
 )
 pipeline = Pipeline()
 
@@ -45,6 +47,8 @@ ALLOWED_ORIGINS = {
     "http://localhost:5173",
     "http://127.0.0.1:5173",
 }
+if PUBLIC_HOST:
+    ALLOWED_ORIGINS.add("https://" + PUBLIC_HOST)
 INSECURE = os.environ.get("PLANREVIEW_INSECURE_NO_AUTH") == "1"
 if INSECURE:
     log.warning("PLANREVIEW_INSECURE_NO_AUTH=1: API authentication is DISABLED. Local development only.")
