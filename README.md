@@ -16,6 +16,10 @@ curl.exe -H "Authorization: Bearer <token>" http://127.0.0.1:8000/api/tasks
 
 Scopes: `read`, `write`, `evidence` (raw evidence and audit verification). For local frontend development only, `PLANREVIEW_INSECURE_NO_AUTH=1` disables authentication (logged loudly). A frontend built before this change must be updated to send the token. Run a **single** Uvicorn worker. Read [docs/backend-hardening-audit.md](docs/backend-hardening-audit.md), [docs/backend-hardening-status.md](docs/backend-hardening-status.md) and [docs/audit-integrity.md](docs/audit-integrity.md) for exactly what is and is not claimed.
 
+## PlanBound frontend (Phase 3)
+
+`web/src/planbound/` is the original PlanBound experience (boot gate, globe, neural network, camera descent, tree, CRT reviewer) running against the real backend. The 3D engine in `engine/` is generated from `design/planbound-site.html` by `tools/port_planbound_engine.py` (bodies unchanged apart from marked `// PORT:` hooks) on three r128; the original CSS and markup are reused. Pages under `pages/` are backend-driven: Workspace, New task, Contract, Plan Review, Evidence, How it works, About. See [docs/phase3_visual_contract.md](docs/phase3_visual_contract.md). Cinematic sections are illustrations and are labelled; task data, verdicts, hashes, the gate and the audit come only from the backend. Real AWS apply is disabled.
+
 ## Architecture (Phase 2)
 
 ```text
@@ -47,7 +51,7 @@ Run each service in its own terminal:
 .\start-frontend.ps1   # Vite     -> http://127.0.0.1:5173
 ```
 
-There is no single-command launcher. Open <http://127.0.0.1:5173>. Check it works:
+There is no single-command launcher. Open <http://127.0.0.1:5173> for the PlanBound interface (hash routes such as `/#/workspace`). The earlier functional console is kept as a fallback at <http://127.0.0.1:5173/console.html>. Check it works:
 
 ```powershell
 curl.exe http://127.0.0.1:8000/api/health   # direct
