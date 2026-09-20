@@ -1,6 +1,6 @@
 <div align="center">
 
-# PlanBound
+# PlanReview
 
 ### A checkpoint between an AI agent and your infrastructure.
 
@@ -18,7 +18,7 @@ Nothing applies unless the gate opens, and every step lands in a **tamper-eviden
 ![Cloud apply](https://img.shields.io/badge/real%20AWS%20apply-disabled-critical)
 
 <!-- Replace with a hero screenshot or GIF -->
-<img src="docs/screenshots/hero.png" alt="PlanBound home: the boundary reviewer robot and globe" width="860">
+<img src="docs/screenshots/hero.png" alt="PlanReview home: the boundary reviewer robot and globe" width="860">
 
 </div>
 
@@ -61,7 +61,7 @@ Task ─► Contract ─► Agent edits .tf ─► terraform plan ─► Canonic
 
 ## Try it
 
-**Hosted:** open **[planbound.onrender.com](https://planbound.onrender.com)**, click through the intro, then press **Start guided demo**. The tour walks through the sample plan and then runs the real Terraform + Cedar pipeline and verifies the audit chain. The free plan sleeps when idle, so the first load can take 30 to 60 seconds, and the first `terraform plan` can take a minute or more.
+**Hosted** (the site UI is branded PlanBound): open **[planbound.onrender.com](https://planbound.onrender.com)**, click through the intro, then press **Start guided demo**. The tour walks through the sample plan and then runs the real Terraform + Cedar pipeline and verifies the audit chain. The free plan sleeps when idle, so the first load can take 30 to 60 seconds, and the first `terraform plan` can take a minute or more.
 
 **Locally (one command):**
 
@@ -88,7 +88,7 @@ Nothing is ever deployed to a cloud account. See [audit integrity](docs/audit-in
 ## Architecture
 
 ```text
-Browser ──► PlanBound site (design/planbound-site.html, three.js, vanilla JS)
+Browser ──► PlanReview site (design/planbound-site.html, three.js, vanilla JS)
               │  same origin
               ▼
         FastAPI  engine/api.py
@@ -108,7 +108,7 @@ Deployed as a single Render web service ([render.yaml](render.yaml)). The build 
 engine/              API, site engine, pipeline, contract, canonicalizer, Cedar evaluator, gate, storage
 cedar/               Policies, schema and policy tests
 terraform/           Fixture configurations and the real-plan generator
-design/              The PlanBound site (planbound-site.html) and its sources
+design/              The site (planbound-site.html) and its sources
 web/                 React console (fallback) and API client
 tools/               Terraform installer, emulator, seeding and verification scripts
 tests/               Backend test suite (real Terraform and Cedar, nothing mocked)
@@ -135,15 +135,18 @@ The signing secret comes from `PLANREVIEW_API_SECRET` (generated on Render) or a
 
 ## Team
 
-| Name | Role | Links |
-|---|---|---|
-| **Afnan** | _Role, e.g. Backend and pipeline_ | [GitHub](https://github.com/tchxm) |
-| _Team member 2_ | _Role_ | _link_ |
-| _Team member 3_ | _Role_ | _link_ |
+**Spider-Man: No Way to Deploy**
+
+| Member |
+|---|
+| Mohammed Afnan |
+| Shivam Kumar |
+| Sejal Pawar |
+| Sourodipto Naskar |
 
 ## License
 
-Released under the [MIT License](LICENSE). Copyright (c) 2026 PlanBound Team.
+Released under the [MIT License](LICENSE). Copyright (c) 2026 Spider-Man: No Way to Deploy.
 
 ---
 
