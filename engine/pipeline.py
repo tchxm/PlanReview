@@ -201,7 +201,7 @@ class Pipeline:
                 env=env,
                 capture_output=True,
                 text=True,
-                timeout=180,
+                timeout=int(os.environ.get("PLANREVIEW_TF_TIMEOUT", "180")),
             )
         except FileNotFoundError:
             raise DependencyError("The terraform binary was not found on PATH", code="TERRAFORM_UNAVAILABLE")

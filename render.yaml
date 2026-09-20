@@ -3,11 +3,17 @@ services:
     name: planbound
     runtime: python
     plan: free
-    buildCommand: pip install -r requirements.txt
-    startCommand: uvicorn engine.api:app --host 0.0.0.0 --port $PORT
+    # Installs the Terraform CLI and warms the AWS provider cache so the real pipeline works on the hosted URL.
+    buildCommand: pip install -r requirements.txt && python tools/install_terraform.py
+    # run_site.py = site + API + real pipeline + loopback AWS emulator (seeded with the baseline), one process.
+    startCommand: python run_site.py
     healthCheckPath: /api/health
     envVars:
       - key: PYTHON_VERSION
         value: 3.12.7
+      - key: HOST
+        value: 0.0.0.0
+      - key: PLANBOUND_PIPELINE
+        value: "1"
       - key: PLANREVIEW_API_SECRET
         generateValue: true

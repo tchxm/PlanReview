@@ -141,7 +141,7 @@ def apply_saved(contract, run, resolutions):
     try:
         report("terraform apply")
         p = run_tree(
-            command, cwd=run["workspace"], env=child_env, capture_output=True, text=True, timeout=180
+            command, cwd=run["workspace"], env=child_env, capture_output=True, text=True, timeout=int(os.environ.get("PLANREVIEW_TF_TIMEOUT", "180"))
         )
         return {
             "status": "APPLIED" if p.returncode == 0 else "FAILED",

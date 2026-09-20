@@ -22,6 +22,9 @@ if "OneDrive" in str(ROOT):
         print("Copying the Terraform provider cache out of OneDrive (once)...")
         shutil.copytree(ROOT / ".provider-cache", cache)
 
+os.environ.setdefault("PLANREVIEW_TF_TIMEOUT", "900")  # first Terraform runs on Windows can be slow
+if (ROOT / "bin").exists():  # hosted builds put the Terraform CLI here (tools/install_terraform.py)
+    os.environ["PATH"] = str(ROOT / "bin") + os.pathsep + os.environ["PATH"]
 if os.environ.get("PLANBOUND_EMULATOR") != "0":
     try:
         from tools.emulator import Emulator
@@ -29,6 +32,11 @@ if os.environ.get("PLANBOUND_EMULATOR") != "0":
         emu = Emulator().start()
         os.environ.update(emu.env())
         print("Local AWS emulator on", emu.endpoint, "(loopback, dummy credentials)")
+        if shutil.which("terraform"):
+            from tools.seed_emulator import seed
+
+            print("Seeding the emulator with the baseline infrastructure (dev-api Lambda, assets bucket, security group)...")
+            seed(emu)
     except Exception as e:  # moto missing etc.: the site still works, apply reports BLOCKED
         print("Emulator not started:", e)
 
