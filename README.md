@@ -41,6 +41,12 @@ The nav shows **LIVE · server** and every verdict, hash and evidence record com
 
 If the server is unreachable, or you open `design/planbound-site.html` directly (`file://`), the page runs the same engine in the browser: **OFFLINE · browser demo**, sample data, state kept in `sessionStorage`, and Verify integrity is a browser-only consistency check (not a chain). If the server drops mid-session the page says so, keeps your boundary and plan, and offers **Retry** or **Continue offline**; clicking the indicator reconnects and replays offline decisions to the server.
 
+### Deploy (one URL: site + API)
+
+The repo includes `render.yaml`. On [Render](https://render.com): **New → Blueprint**, pick this repo, **Apply**. Render builds with `pip install -r requirements.txt`, starts `uvicorn engine.api:app --host 0.0.0.0 --port $PORT`, and generates `PLANREVIEW_API_SECRET`. The public hostname is read from `RENDER_EXTERNAL_HOSTNAME`; on other hosts set `PLANREVIEW_PUBLIC_HOST` to your domain. Open the URL: the nav shows **LIVE · server**.
+
+Notes: the free plan sleeps when idle (first load takes 30-60 s) and its disk is ephemeral, so site sessions reset on restart (the page starts a new session automatically, or falls back to the offline demo if the server is unreachable). A static-only host (Vercel, Netlify, GitHub Pages) can serve `design/planbound-site.html` but only in offline mode, because it cannot run the Python server.
+
 ## Start on Windows (development)
 
 Requirements: Python 3.11+ (3.12/3.13 tested), Node 20+, Terraform on PATH. Fixture planning uses dummy AWS credentials and performs no AWS refresh or apply. No AWS credentials are needed.
