@@ -36,6 +36,42 @@ def emulator_env(endpoint):
     return env
 
 
+def _apply_direct(canonical, endpoint):
+    """Hosted small instances cannot fit the Terraform AWS provider in memory. This applies the approved, gate-checked
+    changes to the LOOPBACK emulator with boto3 instead (same endpoint rules as the Terraform path) and reads them back."""
+    import boto3
+
+    kw = dict(endpoint_url=endpoint, region_name="ap-south-1", aws_access_key_id="test", aws_secret_access_key="test")
+    done = []
+    for c in canonical:
+        ch = {x.get("attribute") if isinstance(x, dict) else x.attribute: x for x in c.get("changes", [])}
+        after = lambda k: (ch[k].get("after") if isinstance(ch[k], dict) else ch[k].after)
+        if c.get("resource_type") == "aws_lambda_function" and c.get("action") == "update":
+            fields = {"memory_size": "MemorySize", "timeout": "Timeout", "description": "Description"}
+            args = {fields[k]: after(k) for k in ch if k in fields}
+            if len(args) != len(ch):
+                return {"status": "FAILED", "spawned": False, "reason": "Direct emulator apply does not support these attributes for " + c["address"]}
+            lam = boto3.client("lambda", **kw)
+            lam.update_function_configuration(FunctionName="dev-api", **args)
+            got = lam.get_function_configuration(FunctionName="dev-api")
+            if any(got.get(k) != v for k, v in args.items()):
+                return {"status": "FAILED", "spawned": False, "reason": "Emulator read-back did not match the approved change"}
+            done.append("%s %s" % (c["address"], ", ".join("%s=%s" % (k, v) for k, v in args.items())))
+        elif c.get("resource_type") == "aws_s3_bucket" and set(ch) == {"tags"}:
+            tags = after("tags") or {}
+            boto3.client("s3", **kw).put_bucket_tagging(Bucket="planreview-demo-assets", Tagging={"TagSet": [{"Key": k, "Value": v} for k, v in tags.items()]})
+            done.append("%s tags" % c["address"])
+        else:
+            return {"status": "FAILED", "spawned": False, "reason": "Direct emulator apply does not support " + c.get("address", "this change")}
+    return {
+        "status": "APPLIED",
+        "spawned": False,
+        "emulated": True,
+        "method": "Applied through the emulator API (boto3) instead of a Terraform process: this hosted instance has 512 MB of memory and the AWS Terraform provider needs more, so a real terraform apply would crash the server. Run PlanReview locally and the same gate runs terraform apply against the emulator.",
+        "reason": "Applied to the local AWS emulator only and read back: " + "; ".join(done) ,
+    }
+
+
 def digest(path):
     return hashlib.sha256(Path(path).read_bytes()).hexdigest()
 
@@ -137,6 +173,11 @@ def apply_saved(contract, run, resolutions):
         if ep is False:
             return {"status": "BLOCKED", "reason": "PLANREVIEW_EMULATOR_ENDPOINT must point at a loopback address; refusing to apply", "spawned": False}
         child_env, emulated = emulator_env(ep), True
+    if child_env is not None and os.environ.get("PLANREVIEW_APPLY_MODE") == "direct":
+        try:
+            return _apply_direct(canonical, ep)
+        except Exception as e:  # emulator not seeded yet, unreachable, etc.
+            return {"status": "FAILED", "spawned": False, "reason": "Emulator apply failed: %s" % str(e)[:250]}
     command = ["terraform", "apply", "-input=false", "-no-color", "-parallelism=1", str(path.resolve())]
     try:
         report("terraform apply")
