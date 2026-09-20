@@ -137,11 +137,11 @@ def apply_saved(contract, run, resolutions):
         if ep is False:
             return {"status": "BLOCKED", "reason": "PLANREVIEW_EMULATOR_ENDPOINT must point at a loopback address; refusing to apply", "spawned": False}
         child_env, emulated = emulator_env(ep), True
-    command = ["terraform", "apply", "-input=false", "-no-color", str(path.resolve())]
+    command = ["terraform", "apply", "-input=false", "-no-color", "-parallelism=1", str(path.resolve())]
     try:
         report("terraform apply")
         p = run_tree(
-            command, cwd=run["workspace"], env=child_env, capture_output=True, text=True, timeout=int(os.environ.get("PLANREVIEW_TF_TIMEOUT", "180"))
+            command, cwd=run["workspace"], env=child_env, capture_output=True, text=True, timeout=int(os.environ.get("PLANREVIEW_APPLY_TIMEOUT") or os.environ.get("PLANREVIEW_TF_TIMEOUT", "180"))
         )
         return {
             "status": "APPLIED" if p.returncode == 0 else "FAILED",
@@ -149,6 +149,7 @@ def apply_saved(contract, run, resolutions):
             "emulated": emulated,
             "command": command,
             "exit_code": p.returncode,
+            **({"reason": "terraform apply exited %s: %s" % (p.returncode, (p.stderr or p.stdout).strip()[-300:])} if p.returncode else {}),
             "stdout": p.stdout,
             "stderr": p.stderr,
         }

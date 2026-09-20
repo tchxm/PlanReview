@@ -13,6 +13,8 @@ services:
         value: 3.12.7
       - key: HOST
         value: 0.0.0.0
+      - key: PLANREVIEW_APPLY_TIMEOUT
+        value: "240"
       - key: PLANBOUND_PIPELINE
         value: "1"
       - key: PLANREVIEW_API_SECRET

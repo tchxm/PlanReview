@@ -210,9 +210,6 @@ class Pipeline:
 
         env = os.environ.copy()
         env["TF_PLUGIN_CACHE_DIR"] = os.environ.get("PLANREVIEW_PLUGIN_CACHE") or str(ROOT / ".provider-cache")
-        if os.environ.get("RENDER"):  # 512MB instance: keep the Go runtime (AWS provider) inside it
-            env.setdefault("GOMEMLIMIT", "300MiB")
-            env.setdefault("GOGC", "50")
         report(f"terraform {args[0]}")
         try:
             p = run_tree(
