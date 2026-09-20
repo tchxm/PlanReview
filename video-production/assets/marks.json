@@ -1,0 +1,47 @@
+{
+ "gate": 14.71,
+ "gate_end": 50.75,
+ "site": 51.55,
+ "scrolled": 67.06,
+ "steps": [
+  {
+   "t": 70.11,
+   "title": "Define a boundary"
+  },
+  {
+   "t": 74.73,
+   "title": "Define a boundary"
+  },
+  {
+   "t": 79.6,
+   "title": "Read the verdicts"
+  },
+  {
+   "t": 84.83,
+   "title": "Resolve the REVIEW"
+  },
+  {
+   "t": 90.24,
+   "title": "See the gate"
+  },
+  {
+   "t": 95.34,
+   "title": "Now the real pipeline"
+  },
+  {
+   "t": 101.96,
+   "title": "Draft the contract"
+  },
+  {
+   "t": 258.06,
+   "title": "Terraform plans, Cedar decides"
+  },
+  {
+   "t": 276.21,
+   "title": "Prove the audit log"
+  }
+ ],
+ "verdicts": [],
+ "home_again": 282.89,
+ "end": 288.91
+}

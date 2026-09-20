@@ -1,0 +1,74 @@
+<!doctype html><html><head><meta charset="utf-8"><title>PlanReview film scenes</title>
+<style>
+:root{--bg:#0d0d0c;--ink:#efe9dc;--dim:#9a9486;--gold:#c9a24a;--g:#5fbf8a;--a:#e0a63a;--r:#e0524a}
+*{box-sizing:border-box}html,body{margin:0;width:1920px;height:1080px;background:var(--bg);color:var(--ink);overflow:hidden;font-family:Georgia,'Times New Roman',serif}
+.mono{font-family:Consolas,'Courier New',monospace}
+.stage{position:absolute;inset:0;transform-origin:50% 50%;animation:push var(--dur,20s) linear forwards}
+@keyframes push{from{transform:scale(1)}to{transform:scale(1.05)}}
+.vig{position:absolute;inset:0;background:radial-gradient(ellipse at 50% 45%,transparent 45%,rgba(0,0,0,.6));pointer-events:none}
+.rv{opacity:0;transform:translateY(24px);transition:opacity 1s ease,transform 1.2s cubic-bezier(.2,.7,.2,1)}
+.rv.on{opacity:1;transform:none}
+.cap{font:22px Consolas,monospace;letter-spacing:.22em;color:var(--gold);text-transform:uppercase}
+h1{font-weight:400;margin:0;font-size:120px;letter-spacing:-.01em}h2{font-weight:400;margin:0;font-size:64px;line-height:1.1}
+.card{background:#151513;border:1px solid #2c2a25;padding:34px 40px;border-radius:4px}
+.row{font:30px/1.5 Consolas,monospace}.from{color:var(--dim);text-decoration:line-through}.bad{color:var(--r)}.ok{color:var(--g)}
+.line{position:absolute;background:var(--gold)}
+.tag{display:inline-block;font:22px Consolas,monospace;padding:4px 14px;border:1px solid;letter-spacing:.14em}
+.node{position:absolute;border-radius:50%}
+</style></head><body>
+<div class="stage" id="stage"></div><div class="vig"></div>
+<script>
+const Q=new URLSearchParams(location.search),SC=Q.get('s'),V=JSON.parse(decodeURIComponent(Q.get('v')||'%5B%5D'));
+const S=document.getElementById('stage'),D={2:20,3:12,5:22,6:28,'7a':6,'7b':7}[SC];S.style.setProperty('--dur',D+'s');
+const H={};
+H[2]=`
+<div style="position:absolute;left:120px;top:90px" class="cap rv" data-at=".3">THE PROBLEM · REAL FIXTURE · terraform/fixtures</div>
+<div class="node rv" data-at=".5" style="left:930px;top:520px;width:28px;height:28px;background:var(--gold);box-shadow:0 0 60px 20px rgba(201,162,74,.5)"></div>
+<div style="position:absolute;left:120px;top:170px;width:1680px">
+ <h2 class="rv" data-at="1.2">The agent was asked for one change.</h2>
+ <div class="card row mono rv" data-at="2.4" style="margin-top:34px;border-left:4px solid var(--g)"><div class="cap" style="font-size:18px;color:var(--g)">Requested by the human</div>aws_lambda_function.dev_api &nbsp; memory_size <span class="from">512</span> → <b>1024</b></div>
+ <h2 class="rv" data-at="6" style="margin-top:46px;color:var(--a)">The edit carried two more.</h2>
+ <div class="card row mono rv" data-at="7.5" style="margin-top:26px;border-left:4px solid var(--r)"><div class="cap" style="font-size:18px;color:var(--r)">Never requested · outside the boundary</div>
+ aws_s3_bucket_public_access_block &nbsp; block_public_acls <span class="from">true</span> → <b class="bad">false</b><br>
+ aws_security_group &nbsp; ingress <span class="from">[]</span> → <b class="bad">tcp/443 from 10.0.0.0/8</b></div>
+ <p class="rv" data-at="12" style="font-size:44px;color:var(--dim);margin-top:40px">Nobody drew the line. So nothing stopped it.</p>
+</div>`;
+H[3]=`
+<div class="line rv" data-at="1" style="left:1240px;top:180px;width:3px;height:720px;box-shadow:0 0 30px 6px rgba(201,162,74,.5);opacity:0"></div>
+<div class="tag mono" id="chg" style="position:absolute;left:120px;top:520px;color:var(--a);border-color:var(--a);transition:left 3s cubic-bezier(.3,.6,.2,1),opacity 1s">proposed change</div>
+<div class="cap rv" data-at="1.2" style="position:absolute;left:1000px;top:130px">the boundary · confirmed by a human</div>
+<div id="t3" class="rv" data-at="6" style="position:absolute;left:0;right:0;top:340px;text-align:center"><h1>PlanReview</h1>
+<p style="font-size:38px;color:var(--dim);margin:22px 0 0">Make the human's boundary explicit.<br>Judge every change against it before anything applies.</p></div>`;
+H[5]=`
+<div class="cap rv" data-at=".3" style="position:absolute;left:120px;top:80px">HOW IT WORKS · the implemented pipeline</div>
+<div id="flow" style="position:absolute;left:100px;top:200px;width:1720px;display:flex;flex-wrap:wrap;gap:26px 22px;align-items:center"></div>
+<div class="rv card mono" data-at="9.5" style="position:absolute;left:100px;top:620px;width:840px;font-size:24px;line-height:1.6"><div class="cap" style="font-size:16px">cedar/policies/security.cedar</div>@id("public_access")<br>forbid(principal, action, resource)<br>&nbsp;&nbsp;when { context.public_access };</div>
+<div class="rv card mono" data-at="11.5" style="position:absolute;left:980px;top:620px;width:840px;font-size:24px;line-height:1.6"><div class="cap" style="font-size:16px">audit · every event chained</div>each event is HMAC-SHA256 signed and linked to the one before<br>the server recomputes the whole chain on Verify</div>
+<div id="chips" style="position:absolute;left:100px;top:900px;display:flex;gap:16px;flex-wrap:wrap"></div>`;
+H[6]=`
+<div class="cap rv" data-at=".3" style="position:absolute;left:120px;top:80px">HOW AWS IS USED · verified in the repository</div>
+<div style="position:absolute;left:100px;top:170px;width:1720px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:28px">
+<div class="card rv" data-at="1.5" style="border-top:3px solid var(--gold);min-height:520px"><div class="cap" style="font-size:18px">Actually used</div><h2 style="font-size:40px;margin:14px 0">AWS technologies</h2><p class="mono" style="font-size:24px;line-height:1.6">• hashicorp/aws Terraform provider 5.99.0 · real <b>terraform plan</b><br>• moto: open-source AWS emulator on 127.0.0.1 (permitted plans apply here only)<br>• boto3</p></div>
+<div class="card rv" data-at="8" style="border-top:3px solid var(--g);min-height:520px"><div class="cap" style="font-size:18px;color:var(--g)">Resource types modelled</div><h2 style="font-size:40px;margin:14px 0">From the fixtures</h2><p class="mono" style="font-size:24px;line-height:1.7">aws_lambda_function<br>aws_s3_bucket<br>aws_s3_bucket_public_access_block<br>aws_security_group</p></div>
+<div class="card rv" data-at="14" style="border-top:3px solid var(--r);min-height:520px"><div class="cap" style="font-size:18px;color:var(--r)">Not used</div><h2 style="font-size:40px;margin:14px 0">Said plainly</h2><p class="mono" style="font-size:24px;line-height:1.6">• No real AWS account or API calls<br>• No AWS Console<br>• Nothing is deployed<br>• Amazon Verified Permissions is not called; Cedar runs locally</p></div></div>
+<div class="card mono rv" data-at="19" style="position:absolute;left:100px;top:760px;width:1720px;font-size:24px;line-height:1.5"><div class="cap" style="font-size:16px">terraform/fixtures/baseline/main.tf</div>provider "aws" { region = "ap-south-1" &nbsp; access_key = "test" &nbsp; skip_credentials_validation = true &nbsp; … }</div>`;
+H['7a']=`
+<div class="cap rv" data-at=".3" style="position:absolute;left:120px;top:110px">THE SAME CHANGE · NOW EVALUATED</div>
+<div class="card row mono rv" data-at=".8" style="position:absolute;left:120px;top:210px;width:1680px;border-left:4px solid var(--r)">aws_s3_bucket_public_access_block &nbsp; block_public_acls <span class="from">true</span> → <b class="bad">false</b></div>
+<div class="rv" data-at="2" style="position:absolute;left:120px;top:420px"><span class="tag" style="color:var(--r);border-color:var(--r);font-size:56px;padding:12px 40px">DENY</span></div>
+<p class="rv" data-at="3" style="position:absolute;left:120px;top:590px;width:1600px;font-size:40px;line-height:1.4;color:var(--dim)">${V[0]||'Explicit policy forbids public_access'}</p>
+<p class="rv mono" data-at="4" style="position:absolute;left:120px;top:800px;font-size:28px;color:var(--gold)">policy: public_access · the gate stays closed</p>`;
+H['7b']=`
+<div style="position:absolute;left:0;right:0;top:250px;text-align:center"><h1 class="rv" data-at=".5" style="font-size:150px">PlanReview</h1>
+<p class="rv" data-at="1.5" style="font-size:44px;color:var(--ink);margin:26px 0 0">Human intent. Explicit infrastructure boundaries.</p>
+<p class="rv mono" data-at="3" style="font-size:34px;color:var(--gold);margin:70px 0 0">planbound.onrender.com</p>
+<p class="rv mono" data-at="3.4" style="font-size:34px;color:var(--gold);margin:10px 0 0">github.com/tchxm/PlanReview</p>
+<p class="rv" data-at="4" style="font-size:24px;color:var(--dim);margin:40px 0 0">Spider-Man: No Way to Deploy</p></div>`;
+S.innerHTML=H[SC];
+if(SC==5){const st=['Task','Contract<br><small>human confirms</small>','Agent edits<br>Terraform','terraform plan','Canonicalize<br>+ hash','Cedar<br>ALLOW · REVIEW · DENY','Human<br>resolution','Apply gate','Emulator only'];
+ const fl=document.getElementById('flow');st.forEach((t,i)=>{fl.insertAdjacentHTML('beforeend',`<div class="card rv mono" data-at="${1+i*.8}" style="font-size:24px;line-height:1.3;min-width:170px;text-align:center;${i==5?'border-color:var(--gold)':''}">${t}</div>${i<st.length-1?`<div class="rv" data-at="${1.3+i*.8}" style="color:var(--gold);font-size:34px">→</div>`:''}`)});
+ ['FastAPI','Terraform 1.9','Cedar (cedarpy)','SQLite','HMAC-SHA256 audit','moto','three.js','vanilla JS','Render'].forEach((c,i)=>document.getElementById('chips').insertAdjacentHTML('beforeend',`<span class="tag mono rv" data-at="${13+i*.5}" style="color:var(--ink);border-color:#3a372f">${c}</span>`))}
+const t0=performance.now();document.querySelectorAll('[data-at]').forEach(e=>setTimeout(()=>e.classList.add('on'),(+e.dataset.at)*1000));
+if(SC==3)setTimeout(()=>{document.getElementById('chg').style.left='1010px'},1500),setTimeout(()=>{S.style.transition='transform 4s ease';S.style.animation='none';S.style.transform='scale(.9)'},4500),setTimeout(()=>document.getElementById('chg').style.opacity='.45',5000);
+window.__done=D;
+</script></body></html>

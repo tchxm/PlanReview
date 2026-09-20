@@ -1,0 +1,140 @@
+1
+00:00:00,400 --> 00:00:04,301
+An AI agent can propose infrastructure changes in seconds.
+
+2
+00:00:04,301 --> 00:00:08,269
+But who decides whether those changes are actually allowed?
+
+3
+00:00:09,400 --> 00:00:13,405
+Every node in a cloud is a resource someone depends on.
+
+4
+00:00:13,405 --> 00:00:17,994
+Here, an agent was asked to raise one Lambda function's memory.
+
+5
+00:00:17,994 --> 00:00:24,112
+Its edit also loosened an S3 bucket's public access block, and added a network rule.
+
+6
+00:00:24,112 --> 00:00:25,714
+Nobody asked for that.
+
+7
+00:00:25,714 --> 00:00:27,900
+And nobody had drawn the line.
+
+8
+00:00:29,399 --> 00:00:32,080
+PlanReview makes that line explicit.
+
+9
+00:00:32,080 --> 00:00:34,611
+A human confirms a boundary first.
+
+10
+00:00:34,611 --> 00:00:40,270
+Then every proposed change is judged against it, before anything is applied.
+
+11
+00:00:41,399 --> 00:00:49,239
+It starts with a contract: which resources may change, which operations, how many, and what is forbidden.
+
+12
+00:00:49,239 --> 00:00:53,794
+An agent edits Terraform, and Terraform produces a real plan.
+
+13
+00:00:53,794 --> 00:00:57,378
+Cedar policies then give every change a verdict.
+
+14
+00:00:57,378 --> 00:01:00,364
+Allow, when it sits inside the boundary.
+
+15
+00:01:00,364 --> 00:01:02,828
+Review, when a human must decide.
+
+16
+00:01:02,828 --> 00:01:06,039
+And deny, when it crosses a forbidden line.
+
+17
+00:01:06,039 --> 00:01:10,220
+Every verdict shows its reason and the policy behind it.
+
+18
+00:01:10,220 --> 00:01:12,758
+A deny can never be approved away.
+
+19
+00:01:12,758 --> 00:01:22,539
+The apply gate opens only when nothing is denied, and every step is written to a tamper-evident audit chain that anyone can verify.
+
+20
+00:01:24,600 --> 00:01:29,352
+Under the hood, a FastAPI backend drives the pipeline.
+
+21
+00:01:29,352 --> 00:01:31,728
+Terraform creates the plan.
+
+22
+00:01:31,728 --> 00:01:35,337
+A canonicalizer normalizes and hashes it.
+
+23
+00:01:35,337 --> 00:01:36,569
+Cedar decides.
+
+24
+00:01:36,569 --> 00:01:40,529
+SQLite stores tasks and an H-MAC audit chain.
+
+25
+00:01:40,529 --> 00:01:44,930
+The front end is plain JavaScript, with three J S.
+
+26
+00:01:46,600 --> 00:01:48,183
+How does it use AWS?
+
+27
+00:01:48,183 --> 00:01:56,813
+Plans are written for the AWS Terraform provider, covering Lambda functions, S3 buckets, and security groups.
+
+28
+00:01:56,813 --> 00:02:01,009
+Permitted changes apply only to a local AWS emulator.
+
+29
+00:02:01,009 --> 00:02:08,926
+Cedar is the language behind Amazon Verified Permissions, but PlanReview does not call that service.
+
+30
+00:02:08,926 --> 00:02:13,360
+No real AWS account is touched, and nothing is deployed.
+
+31
+00:02:14,599 --> 00:02:16,451
+Back to that same change.
+
+32
+00:02:16,451 --> 00:02:20,672
+PlanReview does not let the public access change through.
+
+33
+00:02:20,672 --> 00:02:23,856
+The boundary stays where the human drew it.
+
+34
+00:02:23,856 --> 00:02:24,671
+PlanReview.
+
+35
+00:02:24,671 --> 00:02:28,299
+Human intent, explicit infrastructure boundaries.
+

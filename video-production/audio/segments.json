@@ -1,0 +1,37 @@
+[
+ {
+  "i": 1,
+  "text": "An AI agent can propose infrastructure changes in seconds. But who decides whether those changes are actually allowed?",
+  "dur": 7.87
+ },
+ {
+  "i": 2,
+  "text": "Every node in a cloud is a resource someone depends on. Here, an agent was asked to raise one Lambda function's memory. Its edit also loosened an S3 bucket's public access block, and added a network rule. Nobody asked for that. And nobody had drawn the line.",
+  "dur": 18.5
+ },
+ {
+  "i": 3,
+  "text": "PlanReview makes that line explicit. A human confirms a boundary first. Then every proposed change is judged against it, before anything is applied.",
+  "dur": 10.87
+ },
+ {
+  "i": 4,
+  "text": "It starts with a contract: which resources may change, which operations, how many, and what is forbidden. An agent edits Terraform, and Terraform produces a real plan. Cedar policies then give every change a verdict. Allow, when it sits inside the boundary. Review, when a human must decide. And deny, when it crosses a forbidden line. Every verdict shows its reason and the policy behind it. A deny can never be approved away. The apply gate opens only when nothing is denied, and every step is written to a tamper-evident audit chain that anyone can verify.",
+  "dur": 41.14
+ },
+ {
+  "i": 5,
+  "text": "Under the hood, a FastAPI backend drives the pipeline. Terraform creates the plan. A canonicalizer normalizes and hashes it. Cedar decides. SQLite stores tasks and an H-MAC audit chain. The front end is plain JavaScript, with three J S.",
+  "dur": 20.33
+ },
+ {
+  "i": 6,
+  "text": "How does it use AWS? Plans are written for the AWS Terraform provider, covering Lambda functions, S3 buckets, and security groups. Permitted changes apply only to a local AWS emulator. Cedar is the language behind Amazon Verified Permissions, but PlanReview does not call that service. No real AWS account is touched, and nothing is deployed.",
+  "dur": 26.76
+ },
+ {
+  "i": 7,
+  "text": "Back to that same change. PlanReview does not let the public access change through. The boundary stays where the human drew it. PlanReview. Human intent, explicit infrastructure boundaries.",
+  "dur": 13.7
+ }
+]
