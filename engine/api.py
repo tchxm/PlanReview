@@ -412,3 +412,22 @@ def verify_audit(principal=EVIDENCE):
     """Recompute the audit hash chain and compare it with the local anchor.
     `ok: true` means no tampering was DETECTED by someone without the key; see docs/audit-integrity.md."""
     return pipeline.store.verify_audit()
+
+
+# ------------------------------------------------- PlanBound site (one origin)
+from pathlib import Path as _Path  # noqa: E402
+
+from fastapi.responses import FileResponse  # noqa: E402
+
+from engine import site as site_api  # noqa: E402
+
+app.include_router(site_api.router)
+SITE_HTML = _Path(__file__).resolve().parents[1] / "design" / "planbound-site.html"
+
+
+@app.get("/", include_in_schema=False)
+def site_index():
+    """Serve the PlanBound site from the same origin as the API (no CORS needed)."""
+    if not SITE_HTML.exists():
+        raise NotFoundError("Site file not found", code="SITE_NOT_FOUND")
+    return FileResponse(SITE_HTML, media_type="text/html; charset=utf-8", headers={"Cache-Control": "no-store"})

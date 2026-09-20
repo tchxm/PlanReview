@@ -27,7 +27,19 @@ Browser -> React/Vite (127.0.0.1:5173) -> relative /api -> FastAPI (127.0.0.1:80
                                                             -> Strands/Ollama, Terraform, Cedar, SQLite
 ```
 
-FastAPI serves **only** the API (`/api/*`, `/docs`, `/openapi.json`); it does not host the frontend and starts with or without `web/dist`. Vite serves the UI and proxies `/api`, `/docs` and `/openapi.json` to FastAPI. All frontend HTTP goes through `web/src/api.js`. See [API contract](docs/api_contract.md) and the [Phase 3 migration map](docs/phase3_migration_map.md). The PlanBound visual site in `design/` is a standalone prototype with sample data; it is not connected to the backend.
+FastAPI serves the API (`/api/*`, `/docs`, `/openapi.json`) and the PlanBound site at `/`; it starts with or without `web/dist` (the Vite console in `web/` is separate). Vite serves the UI and proxies `/api`, `/docs` and `/openapi.json` to FastAPI. All frontend HTTP goes through `web/src/api.js`. See [API contract](docs/api_contract.md) and the [Phase 3 migration map](docs/phase3_migration_map.md). The PlanBound visual site in `design/planbound-site.html` runs two ways (see [PlanBound site](#planbound-site-server-and-offline-modes)).
+
+## PlanBound site (server and offline modes)
+
+One command serves the API and the PlanBound site on a single origin (no CORS):
+
+```powershell
+.\start.ps1            # then open http://127.0.0.1:8000/
+```
+
+The nav shows **LIVE · server** and every verdict, hash and evidence record comes from `/api/site/*`, computed by `engine/site.py` (a port of the in-browser engine: same 8 rules in the same order, same contract hash and plan hash). Evidence is an HMAC-chained log per browser session; **Verify integrity** recomputes the chain on the server. The site API needs no token because it holds no real data or capability: it never touches Terraform, cloud accounts or the task pipeline, and "Apply" only records a simulated event. It is same-origin only, rate limited, size limited and bounded (sessions, records, plan size).
+
+If the server is unreachable, or you open `design/planbound-site.html` directly (`file://`), the page runs the same engine in the browser: **OFFLINE · browser demo**, sample data, state kept in `sessionStorage`, and Verify integrity is a browser-only consistency check (not a chain). If the server drops mid-session the page says so, keeps your boundary and plan, and offers **Retry** or **Continue offline**; clicking the indicator reconnects and replays offline decisions to the server.
 
 ## Start on Windows (development)
 

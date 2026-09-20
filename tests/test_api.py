@@ -64,7 +64,7 @@ def test_api_is_independent_of_frontend_build(monkeypatch):
 
 def test_unknown_routes_are_json_404_not_html():
     client = TestClient(api.app)
-    for path in ["/api/nope", "/api/tasks/x/nope", "/", "/index.html"]:
+    for path in ["/api/nope", "/api/tasks/x/nope", "/index.html"]:  # "/" now serves the PlanBound site (see test_site.py)
         r = client.get(path)
         assert r.status_code == 404, path
         assert r.headers["content-type"].startswith("application/json"), path
