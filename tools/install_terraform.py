@@ -23,10 +23,10 @@ def main():
     bindir = ROOT / "bin"
     bindir.mkdir(exist_ok=True)
     exe = bindir / ("terraform.exe" if system == "windows" else "terraform")
-    if not exe.exists():
+    if not exe.exists() or exe.stat().st_size < 1_000_000:  # a bad earlier download is not a binary
         print("Downloading", url)
         with zipfile.ZipFile(io.BytesIO(urllib.request.urlopen(url, timeout=120).read())) as z:
-            exe.write_bytes(z.read(z.namelist()[0]))
+            exe.write_bytes(z.read(exe.name))  # the zip also holds LICENSE.txt; take the binary by name
         exe.chmod(exe.stat().st_mode | stat.S_IEXEC)
     env = {**os.environ, "PATH": str(bindir) + os.pathsep + os.environ["PATH"], "TF_PLUGIN_CACHE_DIR": str(ROOT / ".provider-cache")}
     (ROOT / ".provider-cache").mkdir(exist_ok=True)
