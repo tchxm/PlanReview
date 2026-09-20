@@ -62,3 +62,61 @@ class ModelUnavailableError(PlanReviewError):
             details=details,
         )
 
+
+
+# --- Hardening: stable, machine-readable API errors (HTTP semantics live here) ---
+
+class NotFoundError(PlanReviewError):
+    """A task or evidence record does not exist."""
+
+    def __init__(self, message="Task not found", code="TASK_NOT_FOUND", details=None):
+        super().__init__(message, code=code, status_code=404, details=details)
+
+
+class InvalidRequestError(PlanReviewError):
+    """The request or contract data is invalid (HTTP 422)."""
+
+    def __init__(self, message, code="INVALID_REQUEST", details=None):
+        super().__init__(message, code=code, status_code=422, details=details)
+
+
+class StateConflictError(PlanReviewError):
+    """The request is valid but the task is in the wrong state for it (HTTP 409)."""
+
+    def __init__(self, message, code="STATE_CONFLICT", details=None):
+        super().__init__(message, code=code, status_code=409, details=details)
+
+
+class IntegrityError(StateConflictError):
+    """Stored evidence failed an integrity check. Never silently continues."""
+
+    def __init__(self, message, code="INTEGRITY_CHECK_FAILED", details=None):
+        super().__init__(message, code=code, details=details)
+
+
+class GuardRejectedError(StateConflictError):
+    """The pre-plan guard rejected the prepared workspace."""
+
+    def __init__(self, message, details=None):
+        super().__init__(message, code="PREPLAN_GUARD_REJECTED", details=details)
+
+
+class DependencyError(PlanReviewError):
+    """A local dependency (Terraform binary, fixtures, Ollama) is unavailable (HTTP 503)."""
+
+    def __init__(self, message, code="DEPENDENCY_UNAVAILABLE", details=None):
+        super().__init__(message, code=code, status_code=503, details=details)
+
+
+class TerraformError(PlanReviewError):
+    """Terraform ran and failed or timed out. Raw output stays in server logs."""
+
+    def __init__(self, message, code="TERRAFORM_FAILED", status_code=502, details=None):
+        super().__init__(message, code=code, status_code=status_code, details=details)
+
+
+class ModelResponseInvalidError(PlanReviewError):
+    """The local model answered, but not with a usable structured intent (HTTP 502)."""
+
+    def __init__(self, message, details=None):
+        super().__init__(message, code="MODEL_RESPONSE_INVALID", status_code=502, details=details)

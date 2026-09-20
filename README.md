@@ -4,6 +4,18 @@ A local security checkpoint for Terraform changes. Confirm an immutable contract
 
 **Working locally:** real Terraform fixtures, deterministic and Cedar evaluation, FastAPI, SQLite audit, React/Tailwind console, local Ollama/Strands Terraform editing, blocked AWS apply proof, and successful local-resource apply proof. Docker-based emulator apply remains unavailable. See [STATUS.md](STATUS.md).
 
+## Backend hardening (API v2)
+
+The API now requires a bearer token (except `GET /api/health`). The signing secret comes from `PLANREVIEW_API_SECRET` or a generated file `data/api_secret` (gitignored; never commit it).
+
+```powershell
+.\.venv\Scripts\python.exe -m engine.auth mint --scopes read,write --ttl 8h          # prints a token once
+curl.exe -H "Authorization: Bearer <token>" http://127.0.0.1:8000/api/tasks
+.\.venv\Scripts\python.exe -m engine.audit_verify                                   # verify the audit hash chain
+```
+
+Scopes: `read`, `write`, `evidence` (raw evidence and audit verification). For local frontend development only, `PLANREVIEW_INSECURE_NO_AUTH=1` disables authentication (logged loudly). A frontend built before this change must be updated to send the token. Run a **single** Uvicorn worker. Read [docs/backend-hardening-audit.md](docs/backend-hardening-audit.md), [docs/backend-hardening-status.md](docs/backend-hardening-status.md) and [docs/audit-integrity.md](docs/audit-integrity.md) for exactly what is and is not claimed.
+
 ## Architecture (Phase 2)
 
 ```text

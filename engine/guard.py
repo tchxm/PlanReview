@@ -9,6 +9,8 @@ Enforces:
 """
 
 from __future__ import annotations
+
+from engine.exceptions import GuardRejectedError
 from pathlib import Path
 import re
 from typing import Any
@@ -39,7 +41,7 @@ def verify_workspace_files(workspace_path: Path) -> None:
     for entry in workspace_path.iterdir():
         if entry.is_dir():
             if entry.name != ".terraform":
-                raise ValueError(
+                raise GuardRejectedError(
                     f"Unexpected directory in workspace: {entry.name}. Arbitrary directory structures are rejected."
                 )
             continue
@@ -47,7 +49,7 @@ def verify_workspace_files(workspace_path: Path) -> None:
             # Generated plan artifacts
             continue
         if entry.name not in ALLOWED_WORKSPACE_FILES:
-            raise ValueError(
+            raise GuardRejectedError(
                 f"Unexpected file in workspace: {entry.name}. Only controlled baseline files are allowed."
             )
 
@@ -68,7 +70,7 @@ def verify_workspace_configuration(
 ) -> None:
     """Run comprehensive pre-planning security and attribute checks."""
     if not workspace_path.exists():
-        raise ValueError("Workspace does not exist")
+        raise GuardRejectedError("Workspace does not exist")
 
     # 1. File inventory
     verify_workspace_files(workspace_path)
@@ -76,7 +78,7 @@ def verify_workspace_configuration(
     # 2. Provider header verification
     config_path = workspace_path / "main.tf"
     if not config_path.exists():
-        raise ValueError("Workspace main.tf is missing")
+        raise GuardRejectedError("Workspace main.tf is missing")
 
     config = config_path.read_text(encoding="utf-8")
     root = root_path or Path(__file__).resolve().parents[1]
@@ -86,13 +88,13 @@ def verify_workspace_configuration(
     config_header = re.split(r'\bresource\s+["\']?', config, maxsplit=1)[0]
     baseline_header = re.split(r'\bresource\s+["\']?', baseline, maxsplit=1)[0]
     if config_header.strip() != baseline_header.strip():
-        raise ValueError(
+        raise GuardRejectedError(
             "Provider header modified or unsupported provider declarations present; planning blocked"
         )
 
     # 3. Forbidden executable constructs
     if FORBIDDEN_CONSTRUCTS.search(config):
-        raise ValueError(
+        raise GuardRejectedError(
             "Unsupported executable Terraform configuration (provisioners, modules, data sources, or backend); planning blocked"
         )
 
@@ -100,7 +102,7 @@ def verify_workspace_configuration(
     declared_resources = extract_resource_declarations(config)
     for r_type, r_name in declared_resources:
         if (r_type, r_name) not in ALLOWED_RESOURCE_DECLARATIONS:
-            raise ValueError(
+            raise GuardRejectedError(
                 f"Unauthorized resource declaration '{r_type}.{r_name}' detected. "
                 f"Genuine Phase 1 baseline only permits dev_api Lambda, api SG, and assets S3 bucket."
             )
@@ -114,19 +116,19 @@ def verify_workspace_configuration(
             # Extract memory_size
             mem_match = re.search(r'resource\s+"aws_lambda_function"\s+"dev_api"\s*\{[^}]*?memory_size\s*=\s*(\d+)', config, re.DOTALL)
             if not mem_match:
-                raise ValueError("aws_lambda_function.dev_api memory_size declaration missing")
+                raise GuardRejectedError("aws_lambda_function.dev_api memory_size declaration missing")
             mem_val = int(mem_match.group(1))
 
             req_val = intent.get("requested_value") if intent else 1024
             if req_val and mem_val != req_val:
-                raise ValueError(
+                raise GuardRejectedError(
                     f"Configuration memory_size ({mem_val}) does not match confirmed requested value ({req_val})"
                 )
 
             # Reconstruct expected config and compare
             expected_config = baseline.replace("memory_size = 512", f"memory_size = {mem_val}")
             if config.strip() != expected_config.strip():
-                raise ValueError(
+                raise GuardRejectedError(
                     "Unauthorized configuration changes detected outside permitted Lambda memory_size attribute"
                 )
 
@@ -142,7 +144,7 @@ def verify_workspace_configuration(
                 expected_replacement,
             )
             if config.strip() != expected_config.strip():
-                raise ValueError(
+                raise GuardRejectedError(
                     "Unauthorized configuration changes detected outside permitted S3 bucket Team tag"
                 )
 

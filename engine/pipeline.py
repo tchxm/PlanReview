@@ -1,4 +1,4 @@
-import json, shutil, subprocess, uuid, threading, re, hashlib
+import os, json, shutil, subprocess, uuid, threading, re, hashlib
 from pathlib import Path
 from datetime import datetime, timezone
 from engine.storage import Store
@@ -9,9 +9,41 @@ from engine.evaluator import evaluate_all
 from engine.gate import apply_saved, digest
 from engine.intent import interpret
 from engine.guard import verify_workspace_configuration
+from engine.exceptions import (
+    DependencyError, IntegrityError, InvalidRequestError, StateConflictError, TerraformError,
+)
+import logging
+
+log = logging.getLogger("planreview")
 
 ROOT = Path(__file__).resolve().parents[1]
-LOCK = threading.RLock()
+LOCK = threading.RLock()  # legacy name, no longer used by the API
+
+
+class TaskLocks:
+    """Per-task mutation locks. Mutations of ONE task are serialized (so a plan, an edit
+    or a resolution can never interleave on the same task or saved plan); different
+    tasks proceed in parallel. In-process only: run a single Uvicorn worker (see docs)."""
+
+    MAX = 5000
+
+    def __init__(self):
+        self._guard = threading.Lock()
+        self._locks = {}
+
+    def get(self, task_id):
+        with self._guard:
+            if len(self._locks) > self.MAX:  # drop idle entries created by unknown ids
+                for k, lk in list(self._locks.items()):
+                    if lk.acquire(blocking=False):
+                        try:
+                            del self._locks[k]
+                        finally:
+                            lk.release()
+            return self._locks.setdefault(task_id, threading.RLock())
+
+
+LOCKS = TaskLocks()
 
 
 def contract_digest(contract):
@@ -26,18 +58,21 @@ def assert_contract_integrity(task):
         expected = task.get("confirmed_contract_hash")
         actual = contract_digest(task["contract"])
         if not expected or expected != actual:
-            raise ValueError("Confirmed contract integrity hash mismatch")
+            raise IntegrityError("Confirmed contract integrity hash mismatch", code="CONTRACT_INTEGRITY_FAILED")
 
 
 class Pipeline:
     def __init__(self, data=None):
-        self.data = Path(data or ROOT / "data").resolve()
+        self.data = Path(data or os.environ.get("PLANREVIEW_DATA_DIR") or ROOT / "data").resolve()
         self.data.mkdir(parents=True, exist_ok=True)
-        self.store = Store(self.data / "planreview.sqlite")
+        from engine import auth as _auth
+        from engine.storage import derive_audit_key
+
+        self.store = Store(self.data / "planreview.sqlite", key=derive_audit_key(_auth.load_secret(self.data)))
 
     def create(self, task, mode="replay"):
         if mode not in ["replay", "adversarial", "ollama", "live"]:
-            raise ValueError("Unknown mode")
+            raise InvalidRequestError("Unknown mode", code="UNKNOWN_MODE")
 
         # Extract structured intent and validate against capability registry
         intent_proposal = interpret(task, mode=mode)
@@ -61,10 +96,10 @@ class Pipeline:
     def confirm(self, id, body=None):
         t = self.store.get(id)
         if t["contract"]["status"] != "draft":
-            raise ValueError("Contract is immutable after confirmation")
+            raise StateConflictError("Contract is immutable after confirmation", code="CONTRACT_IMMUTABLE")
         c = Contract.model_validate(body or t["contract"])
         if c.contract_id != id:
-            raise ValueError("Contract ID cannot change")
+            raise InvalidRequestError("Contract ID cannot change", code="CONTRACT_ID_MISMATCH")
         t["contract"] = confirm(c).model_dump(mode="json")
         t["confirmed_contract_hash"] = contract_digest(t["contract"])
         t["stage"] = "confirmed"
@@ -75,16 +110,16 @@ class Pipeline:
         t = self.store.get(id)
         assert_contract_integrity(t)
         if not Contract.model_validate(t["contract"]).active():
-            raise ValueError("Active confirmed contract required")
+            raise StateConflictError("Active confirmed contract required", code="CONTRACT_NOT_ACTIVE")
         if variant not in ["baseline", "intended", "review", "poisoned", "adversarial"]:
-            raise ValueError("Unknown fixture")
+            raise InvalidRequestError("Unknown fixture", code="UNKNOWN_FIXTURE")
         workspace = self.data / "workspaces" / id
         if t.get("prepared"):
-            raise ValueError("Plan the prepared edit before editing again")
+            raise StateConflictError("Plan the prepared edit before editing again", code="EDIT_ALREADY_PREPARED")
         if not workspace.exists():
             source = ROOT / "terraform/fixtures/baseline"
             if not (source / "terraform.tfstate").exists():
-                raise ValueError("Pipeline incomplete: run fixture generator first")
+                raise DependencyError("Terraform fixtures are missing; run the fixture generator", code="FIXTURES_UNAVAILABLE")
             workspace.mkdir(parents=True)
             for name in ["terraform.tfstate", "lambda.zip", ".terraform.lock.hcl"]:
                 shutil.copy2(source / name, workspace / name)
@@ -146,25 +181,36 @@ class Pipeline:
 
         env = os.environ.copy()
         env["TF_PLUGIN_CACHE_DIR"] = str(ROOT / ".provider-cache")
-        p = subprocess.run(
-            ["terraform", *args],
-            cwd=path,
-            env=env,
-            capture_output=True,
-            text=True,
-            timeout=180,
-        )
+        try:
+            p = subprocess.run(
+                ["terraform", *args],
+                cwd=path,
+                env=env,
+                capture_output=True,
+                text=True,
+                timeout=180,
+            )
+        except FileNotFoundError:
+            raise DependencyError("The terraform binary was not found on PATH", code="TERRAFORM_UNAVAILABLE")
+        except subprocess.TimeoutExpired:
+            log.error("terraform %s timed out", args[0])
+            raise TerraformError("Terraform timed out; inspect the workspace before retrying", code="TERRAFORM_TIMEOUT", status_code=504)
         if p.returncode:
-            raise ValueError(p.stdout + p.stderr)
+            # Raw output can contain paths and values: keep it in the server log only.
+            log.error("terraform %s failed (exit %s): %s", args[0], p.returncode, (p.stdout + p.stderr)[-4000:])
+            raise TerraformError(
+                f"terraform {args[0]} failed (exit {p.returncode}); details are in the server log",
+                details={"command": args[0], "exit_code": p.returncode},
+            )
         return p.stdout
 
     def plan(self, id):
         t = self.store.get(id)
         assert_contract_integrity(t)
         if not t.get("prepared"):
-            raise ValueError("Pipeline incomplete: run edits first")
+            raise StateConflictError("Pipeline incomplete: run edits first", code="STAGE_OUT_OF_ORDER")
         if not Contract.model_validate(t["contract"]).active():
-            raise ValueError("Contract expired")
+            raise StateConflictError("Contract expired", code="CONTRACT_EXPIRED")
         path = Path(t["workspace"])
 
         # Pre-plan configuration and workspace integrity guard
@@ -219,7 +265,7 @@ class Pipeline:
         assert_contract_integrity(t)
         run = self.latest(t)
         if digest(run["raw_path"]) != run["raw_hash"]:
-            raise ValueError("Raw plan hash mismatch")
+            raise IntegrityError("Raw plan hash mismatch", code="PLAN_INTEGRITY_FAILED")
         run["canonical"] = [
             c.model_dump()
             for c in canonicalize(json.loads(Path(run["raw_path"]).read_text()))
@@ -236,7 +282,7 @@ class Pipeline:
         assert_contract_integrity(t)
         run = self.latest(t)
         if run["canonical"] is None:
-            raise ValueError("Pipeline incomplete: canonicalize first")
+            raise StateConflictError("Pipeline incomplete: canonicalize first", code="STAGE_OUT_OF_ORDER")
         run["verdicts"] = [
             v.model_dump()
             for v in evaluate_all(
@@ -255,7 +301,12 @@ class Pipeline:
         assert_contract_integrity(t)
         run = self.latest(t)
         if run["verdicts"] is None:
-            raise ValueError("Pipeline incomplete: evaluate first")
+            raise StateConflictError("Pipeline incomplete: evaluate first", code="STAGE_OUT_OF_ORDER")
+        from engine.evaluator import POLICY as _POLICY
+
+        if run.get("policy_hash") != digest(_POLICY):
+            # Fail closed: never record an approval against verdicts made under a different policy.
+            raise StateConflictError("Policies changed; evaluate again and resolve the new verdicts", code="POLICY_CHANGED")
         reviews = {v["address"] for v in run["verdicts"] if v["verdict"] == "REVIEW"}
         eval_errors = {
             v["address"]
@@ -266,12 +317,14 @@ class Pipeline:
         }
         for address, decision in resolutions.items():
             if address in eval_errors:
-                raise ValueError(
-                    f"Address {address} experienced an evaluation error and cannot be approved. Repair evaluation and re-run."
+                raise StateConflictError(
+                    f"Address {address} experienced an evaluation error and cannot be approved. Repair evaluation and re-run.",
+                    code="EVALUATION_ERROR_NOT_APPROVABLE",
                 )
             if address not in reviews or decision not in ["approve", "reject"]:
-                raise ValueError(
-                    "Only REVIEW items accept approve/reject resolutions; DENY requires a new plan"
+                raise StateConflictError(
+                    "Only REVIEW items accept approve/reject resolutions; DENY requires a new plan",
+                    code="RESOLUTION_NOT_ALLOWED",
                 )
         run["resolutions"].update(resolutions)
         t["stage"] = "resolved"
@@ -287,17 +340,17 @@ class Pipeline:
         assert_contract_integrity(t)
         run = self.latest(t)
         if run["verdicts"] is None:
-            raise ValueError("Pipeline incomplete: evaluate first")
+            raise StateConflictError("Pipeline incomplete: evaluate first", code="STAGE_OUT_OF_ORDER")
         if (
             run.get("apply_result", {})
             and run["apply_result"].get("status") == "APPLIED"
         ):
-            raise ValueError("Run already applied")
+            raise StateConflictError("Run already applied", code="RUN_ALREADY_APPLIED")
         if t.get("prepared"):
-            raise ValueError("Unplanned edits exist; create and evaluate a new plan")
+            raise StateConflictError("Unplanned edits exist; create and evaluate a new plan", code="UNPLANNED_EDITS")
         if run.get("policy_hash") != digest(POLICY):
-            raise ValueError(
-                "Policies changed; evaluate again and resolve the new verdicts"
+            raise StateConflictError(
+                "Policies changed; evaluate again and resolve the new verdicts", code="POLICY_CHANGED"
             )
         run["apply_result"] = apply_saved(
             Contract.model_validate(t["contract"]), run, run["resolutions"]
@@ -309,5 +362,5 @@ class Pipeline:
     @staticmethod
     def latest(t):
         if not t["runs"]:
-            raise ValueError("Pipeline incomplete: no saved plan")
+            raise StateConflictError("Pipeline incomplete: no saved plan", code="NO_SAVED_PLAN")
         return t["runs"][-1]

@@ -1,3 +1,4 @@
+from engine.exceptions import StateConflictError
 from pathlib import Path
 from engine.types import Contract, CanonicalChange, Verdict
 from engine.mapper import context
@@ -7,7 +8,7 @@ POLICY = Path(__file__).resolve().parents[2] / "cedar/policies/security.cedar"
 
 def evaluate(contract: Contract, change: CanonicalChange, backend="cedar") -> Verdict:
     if not contract.active():
-        raise ValueError("Contract expired or unconfirmed; no verdicts are trusted")
+        raise StateConflictError("Contract expired or unconfirmed; no verdicts are trusted", code="CONTRACT_NOT_ACTIVE")
     ctx = context(contract, change)
     ids = []
     if backend == "deterministic":
@@ -77,7 +78,7 @@ def evaluate(contract: Contract, change: CanonicalChange, backend="cedar") -> Ve
 
 def evaluate_all(contract, changes, backend="cedar"):
     if not contract.active():
-        raise ValueError("Contract expired or unconfirmed; apply blocked")
+        raise StateConflictError("Contract expired or unconfirmed; apply blocked", code="CONTRACT_NOT_ACTIVE")
     verdicts = [evaluate(contract, c, backend) for c in changes]
     if len(changes) > contract.max_changed_resources:
         for v in verdicts:

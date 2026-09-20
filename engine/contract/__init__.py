@@ -2,6 +2,7 @@ from datetime import datetime, timedelta, timezone
 from uuid import uuid4
 from typing import Any
 from engine.types import Contract
+from engine.exceptions import InvalidRequestError, StateConflictError
 from pydantic import Field
 
 
@@ -13,7 +14,7 @@ class DraftContract(Contract):
 
 def draft(task: str, mode: str = "replay", intent: Any = None) -> Contract:
     if not task.strip():
-        raise ValueError("Task is required")
+        raise InvalidRequestError("Task is required", code="TASK_REQUIRED")
 
     allowed_addresses = ("aws_lambda_function.dev_api",)
     allowed_types = ("aws_lambda_function",)
@@ -44,7 +45,7 @@ def draft(task: str, mode: str = "replay", intent: Any = None) -> Contract:
 
 def confirm(contract: Contract) -> Contract:
     if contract.status != "draft":
-        raise ValueError("Contract already confirmed and immutable")
+        raise StateConflictError("Contract already confirmed and immutable", code="CONTRACT_IMMUTABLE")
     if contract.expires_at <= datetime.now(timezone.utc):
-        raise ValueError("Contract expired")
+        raise StateConflictError("Contract expired", code="CONTRACT_EXPIRED")
     return Contract.model_validate({**contract.model_dump(), "status": "confirmed"})

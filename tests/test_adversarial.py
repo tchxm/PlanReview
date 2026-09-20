@@ -129,7 +129,7 @@ def test_08_malformed_contract_api_fails_closed(tmp_path, monkeypatch):
     monkeypatch.setattr(api, "pipeline", Pipeline(tmp_path))
     client = TestClient(api.app)
     task = client.post("/api/tasks", json={"task": "scope"}).json()
-    assert client.post(f"/api/tasks/{task['id']}/confirm", json={"contract_id": task["id"], "status": "confirmed"}).status_code == 409
+    assert client.post(f"/api/tasks/{task['id']}/confirm", json={"contract_id": task["id"], "status": "confirmed"}).status_code == 422
     assert client.post(f"/api/tasks/{task['id']}/confirm", content="not-json", headers={"content-type": "application/json"}).status_code == 422
 
 

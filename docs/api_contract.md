@@ -1,4 +1,24 @@
-# PlanReview backend API contract (Phase 2)
+# PlanReview backend API contract
+
+> ## API version 2 (backend hardening) supersedes parts of the text below
+> Responses carry `X-PlanReview-API: 2`, `X-Request-ID` and `Cache-Control: no-store`.
+>
+> **Authentication.** Every route except `GET /api/health` requires `Authorization: Bearer <token>`. Tokens are signed, expiring and scoped (`read`, `write`, `evidence`). Mint one with `python -m engine.auth mint --scopes read,write --ttl 8h`. Errors: `401 AUTH_REQUIRED | AUTH_INVALID | AUTH_EXPIRED`, `403 AUTH_SCOPE`. `PLANREVIEW_INSECURE_NO_AUTH=1` disables authentication for local development only (logged loudly; `/api/health` reports `auth: "disabled"`).
+>
+> **One error envelope.** `{"detail": {"error": CODE, "message", "details", "request_id"}}` for every error, including 404 routes and 500s. Statuses: `404 TASK_NOT_FOUND | EVIDENCE_NOT_FOUND | ROUTE_NOT_FOUND`; `422 INVALID_REQUEST | INVALID_CONTRACT | UNKNOWN_MODE | UNKNOWN_FIXTURE | CONTRACT_ID_MISMATCH | TASK_REQUIRED | AGENT_EDIT_REJECTED`; `409 CONTRACT_NOT_ACTIVE | CONTRACT_IMMUTABLE | CONTRACT_EXPIRED | STAGE_OUT_OF_ORDER | NO_SAVED_PLAN | EDIT_ALREADY_PREPARED | RUN_ALREADY_APPLIED | UNPLANNED_EDITS | POLICY_CHANGED | RESOLUTION_NOT_ALLOWED | EVALUATION_ERROR_NOT_APPROVABLE | PREPLAN_GUARD_REJECTED | CONTRACT_INTEGRITY_FAILED | PLAN_INTEGRITY_FAILED`; `400 UNSUPPORTED_OPERATION | AMBIGUOUS_REQUEST`; `403 ORIGIN_BLOCKED`; `502 TERRAFORM_FAILED | MODEL_RESPONSE_INVALID`; `503 MODEL_UNAVAILABLE | DEPENDENCY_UNAVAILABLE | FIXTURES_UNAVAILABLE | TERRAFORM_UNAVAILABLE`; `504 TERRAFORM_TIMEOUT`; `500 INTERNAL_ERROR`. Messages are scrubbed of absolute paths and credentials; raw diagnostics are only in the server log, keyed by `request_id`. Unknown failures are never reported as client errors.
+>
+> **Data exposure.** Task and audit responses no longer contain `workspace`, `plan_path`, `raw_path`, `plan_stdout`, `raw_plan` or the edited Terraform text. Runs carry hashes, canonical changes, verdicts, resolutions, `apply_result`, `plan_summary` and `raw_evidence_available`. Audit events are summarised (`agent_edits` keeps only `terraform_sha256`). Raw records: `GET /api/tasks/{id}/evidence/{event_id}` (scope `evidence`, access is logged without content).
+>
+> **New routes.** `GET /api/auth/whoami` (read), `GET /api/tasks/{id}/evidence/{event_id}` (evidence), `GET /api/audit/verify` (evidence; see `docs/audit-integrity.md`). New optional field `intent.mapped_from` when a model's informal resource name was mapped by the deterministic allowlist.
+>
+> **Coordination.** Mutations are serialized per task; reads never wait for a mutation; different tasks run in parallel. Run a **single Uvicorn worker**: locks are in-process.
+>
+> **Configuration.** `PLANREVIEW_OLLAMA_HOST` (loopback only unless `PLANREVIEW_OLLAMA_ALLOW_REMOTE=1`), `PLANREVIEW_OLLAMA_MODEL`, `PLANREVIEW_OLLAMA_TIMEOUT`, `PLANREVIEW_OLLAMA_CHAT_TIMEOUT`, `PLANREVIEW_DATA_DIR`, `PLANREVIEW_API_SECRET`.
+>
+> **Not yet in v2:** durable jobs, progress and cancellation of long operations, idempotency keys. Long stages are still single blocking requests, and a browser timeout is not a cancellation.
+
+---
+
 
 Documents the API **as implemented** in `engine/api.py` and `engine/pipeline.py` on the Phase 1 code. Shapes were observed against a running backend. Nothing here is aspirational; gaps are listed in the last section. The machine-generated schema is at `/openapi.json` and `/docs`, but most responses are untyped dicts, so this document is the reference for response bodies.
 

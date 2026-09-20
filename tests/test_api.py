@@ -31,7 +31,9 @@ def test_fuzzy_deny_rejected(tmp_path, monkeypatch):
     t = client.post("/api/tasks", json={"task": "Increase memory"}).json()
     c = t["contract"]
     c["denies"] = ["anything scary"]
-    assert client.post(f"/api/tasks/{t['id']}/confirm", json=c).status_code == 409
+    r = client.post(f"/api/tasks/{t['id']}/confirm", json=c)
+    # Hardening: invalid contract data is a 422 with a stable code, not a generic 409.
+    assert r.status_code == 422 and r.json()["detail"]["error"] == "INVALID_CONTRACT"
 
 
 def test_cross_origin_blocked():
